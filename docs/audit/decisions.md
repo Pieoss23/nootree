@@ -118,3 +118,15 @@ Elenco delle decisioni architetturali e operative prese durante la Milestone 1, 
 **Motivazione**: `ConsoleEmailProvider` non deve mai essere usato in produzione (vedi il suo stesso commento e `docs/architecture/authentication-boundary.md`); un semplice `if (RESEND_API_KEY) ... else Console` senza il caso produzione avrebbe permesso a un deploy mal configurato di "funzionare" silenziosamente senza mai inviare email. Prendere `env` come parametro rende la logica di selezione testabile in isolamento (`email-provider-factory.test.ts`) senza dover impostare/mockare variabili d'ambiente reali.
 
 **Verifica**: testato con una chiave Resend fittizia (selezione del provider corretto in dev/prod, errore in produzione senza configurazione) — **non testato con una chiave Resend reale**, non disponibile in questo ambiente. Vedi `docs/audit/open-risks.md`.
+
+---
+
+## 2026-08-09 — Autorizzazione per ruolo: stessa soglia (`ASSISTANT`) per tutte le scritture pazienti
+
+**Decisione**: `createPatientAction`/`updatePatientAction`/`setPatientStatusAction` richiedono `assertRole(tenant.role, "ASSISTANT")` — poiché `ASSISTANT` è il rank minimo esistente, questo equivale in pratica a "qualunque membership attiva può scrivere sui pazienti", identico al comportamento precedente. La differenza è che ora è un controllo esplicito e testato (`src/modules/memberships/authorization.ts`), non un'assenza di controllo.
+
+**Motivazione**: richiesta esplicitamente all'utente prima di implementare (non derivabile dal dominio: nessun documento di prodotto definiva permessi differenziati tra `OWNER`/`NUTRITIONIST`/`ASSISTANT`). L'utente ha confermato nessuna differenziazione per i pazienti in questa milestone. Il pattern (`assertRole`/`InsufficientRoleError`, stesso stile di `assertFeature`/`assertWithinLimit` in entitlements) resta pronto per azioni future che dovranno usare soglie più alte (es. gestione team, quando sarà implementata).
+
+**Alternative scartate**: `ASSISTANT`+ solo su create/update e `NUTRITIONIST`+ su archive/reactivate — proposta come opzione ma non scelta; `NUTRITIONIST`+ per tutto (accesso di sola lettura per `ASSISTANT`) — proposta ma non scelta.
+
+**Fuori scope, registrato come rischio**: un ruolo "superuser" cross-tenant per amministrare tutti gli studi da un unico account, richiesto dall'utente durante questa conversazione. Non è modellabile come `membership.role` (quelli sono per-tenant); richiede un flag/enum a livello piattaforma su `users`, separato, con proprio ADR — vedi `docs/audit/open-risks.md`.

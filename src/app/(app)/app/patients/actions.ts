@@ -16,7 +16,11 @@ import {
   FeatureNotAvailableError,
   ResourceLimitExceededError,
 } from "@/modules/entitlements";
+import { assertRole, InsufficientRoleError } from "@/modules/memberships";
 import { recordAuditEvent } from "@/modules/audit";
+
+/** Every membership role can manage patients; the check exists so this stays an explicit, tested boundary as roles diverge for other actions. */
+const MINIMUM_ROLE_FOR_PATIENT_WRITES = "ASSISTANT" as const;
 
 export type PatientFormState = {
   status: "idle" | "success" | "error";
@@ -65,6 +69,7 @@ export async function createPatientAction(
   }
 
   try {
+    assertRole(tenant.role, MINIMUM_ROLE_FOR_PATIENT_WRITES);
     await assertFeature(tenant.tenantId, "patients.management");
     const activePatients = await countActivePatients(tenant.tenantId);
     await assertWithinLimit(tenant.tenantId, "activePatients", activePatients);
@@ -79,6 +84,9 @@ export async function createPatientAction(
       entityId: patient.id,
     });
   } catch (error) {
+    if (error instanceof InsufficientRoleError) {
+      return { status: "error", message: "Il tuo ruolo non consente di creare pazienti." };
+    }
     if (error instanceof ResourceLimitExceededError) {
       return {
         status: "error",
@@ -116,6 +124,15 @@ export async function updatePatientAction(
     };
   }
 
+  try {
+    assertRole(tenant.role, MINIMUM_ROLE_FOR_PATIENT_WRITES);
+  } catch (error) {
+    if (error instanceof InsufficientRoleError) {
+      return { status: "error", message: "Il tuo ruolo non consente di modificare pazienti." };
+    }
+    throw error;
+  }
+
   const patient = await updatePatient({ tenantId: tenant.tenantId, patientId, ...parsed.data });
   if (!patient) return { status: "error", message: "Paziente non trovato." };
 
@@ -140,6 +157,8 @@ export async function setPatientStatusAction(formData: FormData): Promise<void> 
 
   const tenant = await getActiveTenant();
   if (!tenant) return;
+
+  assertRole(tenant.role, MINIMUM_ROLE_FOR_PATIENT_WRITES);
 
   const patient = await setPatientStatus({ tenantId: tenant.tenantId, patientId, status });
   if (!patient) return;

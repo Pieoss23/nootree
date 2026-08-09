@@ -164,3 +164,26 @@ Ogni voce riporta: data/ora, fase, obiettivo, modifiche, file coinvolti, decisio
 **Decisioni**: vedi `docs/audit/decisions.md` (voce 2026-08-09 — Selezione del provider email).
 
 **Rischi aperti**: autorizzazione per ruolo, rate limiting (ora rilevante anche per costi Resend, non solo sicurezza), invio Resend non testato con chiave reale, billing Stripe, switch tra tenant. Vedi `docs/audit/open-risks.md`.
+
+---
+
+## 2026-08-09 — Milestone 1.1 — Autorizzazione basata su ruolo (scritture pazienti)
+
+**Obiettivo**: chiudere il rischio "nessuna autorizzazione basata su ruolo applicata a un'azione reale", collegando `TenantContext.role` a un enforcement esplicito nelle server action pazienti, come indicato in `docs/audit/open-risks.md` e `docs/security/initial-threat-model.md`.
+
+**Decisione di prodotto** (chiesta esplicitamente all'utente prima di implementare, non derivabile dal codice): tutti e tre i ruoli (`OWNER`/`NUTRITIONIST`/`ASSISTANT`) hanno lo stesso accesso in scrittura sui pazienti — nessuna differenziazione per questo tipo di azione in questa milestone.
+
+**Modifiche**:
+
+- `src/modules/memberships/authorization.ts` (nuovo): `assertRole(role, minimum)` lancia `InsufficientRoleError` se `roleAtLeast(role, minimum)` è falso — stesso pattern di `assertFeature`/`assertWithinLimit` in `src/modules/entitlements`. Esportato da `src/modules/memberships/index.ts`.
+- `src/app/(app)/app/patients/actions.ts`: `createPatientAction`/`updatePatientAction`/`setPatientStatusAction` chiamano `assertRole(tenant.role, "ASSISTANT")` prima di ogni scrittura (`ASSISTANT` è il rank più basso, quindi oggi il controllo non blocca nessun membro con membership attiva — ma stabilisce il punto di enforcement esplicito e testato, pronto per azioni future con soglie più alte). I due action con stato di form (`create`/`update`) intercettano `InsufficientRoleError` e restituiscono un messaggio utente; `setPatientStatusAction` (void, nessun canale di messaggio) lascia propagare l'errore, coerente con il controllo di input già esistente in quella funzione.
+
+**File coinvolti**: `src/modules/memberships/authorization.ts`, `src/modules/memberships/authorization.test.ts`, `src/modules/memberships/index.ts`, `src/app/(app)/app/patients/actions.ts`, `docs/audit/open-risks.md`, `docs/testing/milestone-01-test-strategy.md`.
+
+**Verifica live**: `pnpm dev` + Playwright (`pnpm test:e2e`, 28/28 verdi — CRUD pazienti confermato invariato con l'enforcement attivo). `pnpm typecheck`/`lint`/`format:check`/`test` (61/61 Vitest, inclusi i 2 nuovi test di `authorization.test.ts`) tutti verdi.
+
+**Nota**: durante la richiesta dei permessi, l'utente ha anche chiesto un ruolo "superuser" cross-tenant per amministrare tutti gli studi da un unico punto. Concettualmente distinto dai ruoli di `memberships` (che sono per-tenant) — registrato come voce a sé in `docs/audit/open-risks.md`, da progettare in uno step dedicato, non implementato in questo step.
+
+**Decisioni**: vedi `docs/audit/decisions.md` (voce 2026-08-09 — Autorizzazione per ruolo).
+
+**Rischi aperti**: rate limiting, invio Resend non testato con chiave reale, billing Stripe, switch tra tenant, superuser cross-tenant (nuovo, non progettato). Vedi `docs/audit/open-risks.md`.
