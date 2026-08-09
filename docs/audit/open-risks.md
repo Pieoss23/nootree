@@ -11,9 +11,10 @@ Consolidato al termine della milestone (2026-07-31). Vedi `docs/product/mileston
 
 ## Debito tecnico
 
-- `src/lib/demo-tenant.ts` è un placeholder esplicito che bypassa la risoluzione tenant reale — va rimosso in Milestone 1.1, non deve convivere con `TenantResolver`.
-- Il pulsante "Nuovo paziente" e "Apri Customer Portal" sono disabilitati con tooltip: nessuna azione reale dietro.
-- `assertWithinLimit` (entitlements) richiede che il chiamante fornisca `currentUsage` — non esiste ancora un punto di enforcement automatico prima di una scrittura, perché non esistono ancora scritture su `patients` lato applicazione.
+- `src/lib/demo-tenant.ts` è un placeholder esplicito che bypassa la risoluzione tenant reale — va rimosso in Milestone 1.1, non deve convivere con `TenantResolver`. Le scritture pazienti (`src/app/(app)/app/patients/actions.ts`) dipendono ancora da questo bypass per il `tenantId`; quando `TenantResolver` sarà implementato, andrà aggiornato anche lì.
+- Il pulsante "Apri Customer Portal" è disabilitato con tooltip: nessuna azione reale dietro (Stripe non collegato).
+- ~~`assertWithinLimit` (entitlements) richiede che il chiamante fornisca `currentUsage`... nessun punto di enforcement automatico.~~ Chiuso il 2026-08-09: `createPatientAction` chiama `assertFeature`/`assertWithinLimit` prima di ogni creazione paziente.
+- **Nessuna autorizzazione per ruolo sulle scritture pazienti**: `createPatientAction`/`updatePatientAction`/`setPatientStatusAction` richiedono solo una sessione valida (`authIdentityService.requireUser()`), non verificano ancora il ruolo dell'utente nel tenant (dipende da `TenantResolver`/`MembershipChecker`, non implementati).
 
 ## Funzionalità solo predisposte (interfaccia definita, implementazione reale assente)
 

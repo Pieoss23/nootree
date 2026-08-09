@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Search } from "lucide-react";
+import { Search, MoreHorizontal } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -11,12 +12,60 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { EmptyState, StatusBadge } from "@/components/shared";
-import type { Patient } from "./types";
+import type { Patient } from "@/modules/patients";
+import { setPatientStatusAction } from "./actions";
+import { PatientFormDialog } from "./patient-form-dialog";
 
 type PatientsTableProps = {
   patients: Patient[];
 };
+
+function PatientRowActions({ patient }: { patient: Patient }) {
+  const [editOpen, setEditOpen] = useState(false);
+  const isActive = patient.status === "ACTIVE";
+
+  async function toggleStatus() {
+    const formData = new FormData();
+    formData.set("patientId", patient.id);
+    formData.set("status", isActive ? "ARCHIVED" : "ACTIVE");
+    await setPatientStatusAction(formData);
+  }
+
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={`Azioni per ${patient.firstName} ${patient.lastName}`}
+            />
+          }
+        >
+          <MoreHorizontal className="size-4" aria-hidden />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuGroup>
+            <DropdownMenuItem onClick={() => setEditOpen(true)}>Modifica</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => toggleStatus()}>
+              {isActive ? "Archivia" : "Riattiva"}
+            </DropdownMenuItem>
+          </DropdownMenuGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <PatientFormDialog mode="edit" patient={patient} open={editOpen} onOpenChange={setEditOpen} />
+    </>
+  );
+}
 
 export function PatientsTable({ patients }: PatientsTableProps) {
   const [query, setQuery] = useState("");
@@ -61,6 +110,9 @@ export function PatientsTable({ patients }: PatientsTableProps) {
               <TableHead>Email</TableHead>
               <TableHead>Telefono</TableHead>
               <TableHead>Stato</TableHead>
+              <TableHead className="w-10">
+                <span className="sr-only">Azioni</span>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -76,6 +128,9 @@ export function PatientsTable({ patients }: PatientsTableProps) {
                     label={patient.status === "ACTIVE" ? "Attivo" : "Archiviato"}
                     tone={patient.status === "ACTIVE" ? "success" : "neutral"}
                   />
+                </TableCell>
+                <TableCell>
+                  <PatientRowActions patient={patient} />
                 </TableCell>
               </TableRow>
             ))}

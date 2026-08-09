@@ -42,7 +42,7 @@ test.describe("authenticated", () => {
   test("patients page lists the seeded demo patients", async ({ page }) => {
     await page.goto("/app/patients");
     await expect(page.getByRole("heading", { name: "Pazienti" })).toBeVisible();
-    await expect(page.getByRole("cell", { name: "Anna Bianchi" })).toBeVisible();
+    await expect(page.getByRole("cell", { name: "Anna Bianchi", exact: true })).toBeVisible();
   });
 
   test("sign out ends the session and /app redirects to /login again", async ({ page }) => {

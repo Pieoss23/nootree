@@ -94,3 +94,27 @@ Ogni voce riporta: data/ora, fase, obiettivo, modifiche, file coinvolti, decisio
 **Bug pre-esistente trovato e corretto durante la verifica**: `UserMenu` (`src/components/shared/user-menu.tsx`) usava `DropdownMenuLabel` fuori da un `DropdownMenuGroup` — base-ui lancia `"MenuGroupContext is missing"` non appena il menu viene aperto, mai emerso prima perché nessun test/Playwright apriva effettivamente il menu utente (la voce "Esci" era `disabled`). Corretto avvolgendo label + separator + item in `DropdownMenuGroup`.
 
 **Nota tecnica**: il `signOut` di Auth.js con `redirectTo` lancia internamente un redirect; invocato da un `onClick` su una voce di menu che si chiude (smonta) al click, il redirect rischia di degenerare in un errore non gestito invece che in una navigazione. `authIdentityService.signOut()` usa quindi `redirect: false` e lascia il redirect al chiamante lato client (`UserMenu`, via `useRouter().push("/login")` dopo che l'azione è risolta).
+
+---
+
+## 2026-08-09 — Milestone 1.1 — CRUD pazienti
+
+**Obiettivo**: passare i pazienti da sola lettura a creazione/modifica/archiviazione, come indicato in `docs/product/milestone-01-scope.md` e `docs/audit/open-risks.md`.
+
+**Modifiche**:
+
+- `src/modules/patients/repository.ts`: aggiunte `createPatient`, `updatePatient`, `setPatientStatus`. Nessuna cancellazione fisica: i pazienti vengono archiviati (`status: "ARCHIVED"`, `archivedAt` valorizzato), coerentemente con lo schema già esistente (`patient_status` enum + colonna `archived_at`). `updatePatient`/`setPatientStatus` filtrano sempre per `(tenantId, patientId)`, quindi un tentativo cross-tenant restituisce `null` invece di modificare la riga.
+- `src/modules/patients/validation.ts` (nuovo): schema Zod condiviso da creazione/modifica — normalizza email (`normalizeEmail`) e codice fiscale (`normalizeFiscalCode`, già esistenti in `src/lib/normalize.ts`), valida il formato data (`YYYY-MM-DD`), converte campi opzionali vuoti in `null`.
+- `src/app/(app)/app/patients/actions.ts` (nuovo): `createPatientAction`/`updatePatientAction`/`setPatientStatusAction`. Ogni scrittura richiede una sessione reale (`authIdentityService.requireUser()`) e registra un `recordAuditEvent` (`patient.created`/`patient.updated`/`patient.archived`/`patient.reactivated`) — chiude il rischio "audit non invocato sistematicamente" per questo percorso. La creazione chiama `assertFeature("patients.management")` e `assertWithinLimit("activePatients", …)` prima di scrivere — chiude il rischio "nessun punto di enforcement automatico" per gli entitlement.
+- UI: `patient-form-dialog.tsx` (dialog condiviso creazione/modifica), `patients-page-client.tsx` (wrapper client per lo stato del dialog di creazione), `patients-table.tsx` con menu azioni per riga (Modifica/Archivia/Riattiva) — questi tre file sono stati spostati/creati in `src/app/(app)/app/patients/` (non più in `src/modules/patients/`, per non far dipendere il modulo di dominio dalle server action della route). Aggiunto il componente UI `Textarea` (`src/components/ui/textarea.tsx`).
+- Il tenant di scrittura resta `getDemoTenant()` (fuori scope: `TenantResolver` non implementato — vedi `docs/audit/open-risks.md`).
+
+**File coinvolti**: `src/modules/patients/*`, `src/app/(app)/app/patients/*`, `src/components/ui/textarea.tsx`, `src/tests/db.integration.test.ts`, `tests-e2e/patients-crud.spec.ts`, `tests-e2e/smoke.spec.ts` (una query resa `exact: true` per non confondersi con il nuovo bottone azioni riga), `docs/audit/open-risks.md`.
+
+**Bug scoperto e corretto durante la verifica live**: un file `"use server"` può esportare solo funzioni async — un `export { idleState as patientFormIdleState }` (un oggetto, non una funzione) faceva crashare l'intera pagina con `A "use server" file can only export async functions, found object.`. Lo stato iniziale di `useActionState` è stato spostato nel componente client. Corretto anche l'input email nel form: `type="email"` con validazione nativa del browser impediva l'invio verso il server action per testare la validazione Zod lato server; aggiunto `noValidate` al form per lasciare Zod come unica fonte di verità sulla validazione (con errori per campo già visualizzati inline).
+
+**Verifica live**: `pnpm dev` + Playwright (`pnpm test:e2e`, 22/22 verdi, incluso il nuovo `patients-crud.spec.ts`: crea, modifica, archivia, riattiva un paziente; blocca un'email non valida mostrando l'errore di campo). `pnpm typecheck`/`lint`/`format:check`/`test` (50/50 Vitest, inclusi i nuovi test di validazione e di isolamento tenant sulle scritture) tutti verdi.
+
+**Decisioni**: vedi `docs/audit/decisions.md` (voce 2026-08-09 — CRUD pazienti).
+
+**Rischi aperti**: autorizzazione per ruolo sulle scritture pazienti (dipende da `TenantResolver`/`MembershipChecker`, non implementati), rate limiting, invio email reale. Vedi `docs/audit/open-risks.md`.

@@ -6,7 +6,13 @@ import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { eq, sql } from "drizzle-orm";
 import * as schema from "@/db/schema";
 import { seedDevelopmentData, DEMO_TENANT_SLUG } from "@/db/seed-core";
-import { listPatientsByTenant, getPatientById } from "@/modules/patients";
+import {
+  listPatientsByTenant,
+  getPatientById,
+  createPatient,
+  updatePatient,
+  setPatientStatus,
+} from "@/modules/patients";
 
 /**
  * Exercises the database against TEST_DATABASE_URL only — never the
@@ -211,6 +217,114 @@ describe.skipIf(!testDatabaseUrl)("database integration", () => {
     } as unknown as typeof schema.memberships.$inferInsert;
 
     await expect(db.insert(schema.memberships).values(invalidRoleValues)).rejects.toThrow();
+  });
+
+  it("createPatient scopes the new row to the given tenant", async () => {
+    const [tenant] = await db
+      .insert(schema.tenants)
+      .values({ name: "Create Tenant", slug: `create-${randomUUID()}` })
+      .returning();
+
+    const patient = await createPatient({
+      tenantId: tenant.id,
+      firstName: "Nuovo",
+      lastName: "Paziente",
+      email: null,
+      phone: null,
+      birthDate: null,
+      fiscalCode: null,
+      internalNotes: null,
+    });
+
+    expect(patient.tenantId).toBe(tenant.id);
+    expect(patient.status).toBe("ACTIVE");
+
+    const fetched = await getPatientById({ tenantId: tenant.id, patientId: patient.id });
+    expect(fetched?.id).toBe(patient.id);
+  });
+
+  it("updatePatient refuses to update a patient belonging to another tenant", async () => {
+    const [tenantA] = await db
+      .insert(schema.tenants)
+      .values({ name: "Update Tenant A", slug: `update-a-${randomUUID()}` })
+      .returning();
+    const [tenantB] = await db
+      .insert(schema.tenants)
+      .values({ name: "Update Tenant B", slug: `update-b-${randomUUID()}` })
+      .returning();
+
+    const patient = await createPatient({
+      tenantId: tenantA.id,
+      firstName: "Prima",
+      lastName: "Versione",
+      email: null,
+      phone: null,
+      birthDate: null,
+      fiscalCode: null,
+      internalNotes: null,
+    });
+
+    const crossTenantUpdate = await updatePatient({
+      tenantId: tenantB.id,
+      patientId: patient.id,
+      firstName: "Modificato",
+      lastName: "DaAltroTenant",
+      email: null,
+      phone: null,
+      birthDate: null,
+      fiscalCode: null,
+      internalNotes: null,
+    });
+    expect(crossTenantUpdate).toBeNull();
+
+    const untouched = await getPatientById({ tenantId: tenantA.id, patientId: patient.id });
+    expect(untouched?.firstName).toBe("Prima");
+
+    const sameTenantUpdate = await updatePatient({
+      tenantId: tenantA.id,
+      patientId: patient.id,
+      firstName: "Seconda",
+      lastName: "Versione",
+      email: null,
+      phone: null,
+      birthDate: null,
+      fiscalCode: null,
+      internalNotes: null,
+    });
+    expect(sameTenantUpdate?.firstName).toBe("Seconda");
+  });
+
+  it("setPatientStatus archives and reactivates a patient, tracking archivedAt", async () => {
+    const [tenant] = await db
+      .insert(schema.tenants)
+      .values({ name: "Status Tenant", slug: `status-${randomUUID()}` })
+      .returning();
+    const patient = await createPatient({
+      tenantId: tenant.id,
+      firstName: "Stato",
+      lastName: "Paziente",
+      email: null,
+      phone: null,
+      birthDate: null,
+      fiscalCode: null,
+      internalNotes: null,
+    });
+
+    const archived = await setPatientStatus({
+      tenantId: tenant.id,
+      patientId: patient.id,
+      status: "ARCHIVED",
+    });
+    expect(archived?.status).toBe("ARCHIVED");
+    expect(archived?.archivedAt).not.toBeNull();
+
+    const reactivated = await setPatientStatus({
+      tenantId: tenant.id,
+      patientId: patient.id,
+      status: "ACTIVE",
+    });
+    expect(reactivated?.status).toBe("ACTIVE");
+    expect(reactivated?.archivedAt).toBeNull();
   });
 
   it("cascades tenant deletion to its memberships (not silently orphaned)", async () => {

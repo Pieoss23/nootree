@@ -64,3 +64,29 @@ Elenco delle decisioni architetturali e operative prese durante la Milestone 1, 
 **Decisione**: usare la nuova convenzione `proxy.ts` (root di `src/`) con `export { auth as proxy }` e la callback `authorized` di Auth.js per proteggere `/app/*`.
 
 **Motivazione**: `middleware.ts` è deprecato in questa versione di Next.js e rinominato `proxy.ts` (vedi `node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/proxy.md`); usare il nome deprecato avrebbe significato codice morto (Next.js non lo eseguirebbe più).
+
+---
+
+## 2026-08-09 — CRUD pazienti: archiviazione invece di cancellazione fisica
+
+**Decisione**: "cancellazione" paziente è implementata come cambio di stato (`ACTIVE` → `ARCHIVED`, con `archivedAt` valorizzato), reversibile, non come `DELETE` SQL.
+
+**Motivazione**: lo schema (`src/db/schema/patients.ts`) prevedeva già `patient_status` enum e `archivedAt` proprio per questo; dati anagrafici/clinici non vanno mai persi per un click accidentale, e l'audit trail (`recordAuditEvent`) ha senso solo se la riga a cui si riferisce continua a esistere. Una vera cancellazione fisica non è mai stata nello scope discusso.
+
+**Alternative scartate**: `DELETE` reale con soft-delete via colonna `deletedAt` separata — ridondante, lo schema aveva già uno stato pensato per questo (`ARCHIVED`).
+
+---
+
+## 2026-08-09 — UI dei pazienti spostata da `src/modules/patients/` a `src/app/(app)/app/patients/`
+
+**Decisione**: `patients-table.tsx` (esistente, sola lettura) è stato spostato dal modulo alla route, insieme ai nuovi `patient-form-dialog.tsx` e `patients-page-client.tsx`.
+
+**Motivazione**: la tabella ora richiama direttamente le server action della pagina (`./actions`) per aprire il dialog di modifica e per archiviare/riattivare; tenerla dentro `src/modules/patients/` avrebbe fatto dipendere il modulo di dominio da `src/app/*`, invertendo la separazione dichiarata in `docs/architecture/project-structure.md` (`src/modules/*` = dominio, `src/app` = routing). Il modulo resta con solo tipi, repository e validazione.
+
+---
+
+## 2026-08-09 — Validazione con `noValidate` sul form + Zod lato server come unica fonte di verità
+
+**Decisione**: il form paziente ha l'attributo `noValidate`; tutta la validazione (incluso il formato email) passa da `patientFormSchema` (Zod) eseguito nella server action, con gli errori per campo rimandati al client e mostrati inline.
+
+**Motivazione**: senza `noValidate`, la validazione nativa del browser su `<input type="email">` impediva l'invio del form per email non valide, quindi il percorso di errore lato server non era mai raggiungibile (scoperto scrivendo il test Playwright corrispondente — vedi `docs/audit/execution-log.md`). Con un'unica fonte di verità gli errori mostrati sono sempre coerenti con quanto verrà effettivamente salvato.
