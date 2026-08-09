@@ -64,3 +64,33 @@ Ogni voce riporta: data/ora, fase, obiettivo, modifiche, file coinvolti, decisio
 **Decisioni**: vedi `docs/audit/decisions.md` e gli ADR in `docs/architecture/decisions/`.
 
 **Rischi aperti**: vedi `docs/audit/open-risks.md` (consolidato a fine milestone).
+
+---
+
+## 2026-08-09 — Milestone 1.1 — Autenticazione reale (Auth.js)
+
+**Obiettivo**: chiudere il rischio "nessuna autenticazione reale" collegando `IdentityService` a un'implementazione reale, come indicato in `docs/audit/open-risks.md`.
+
+**Modifiche**:
+
+- Aggiunte le dipendenze `next-auth@5.0.0-beta.32` e `@auth/drizzle-adapter@1.11.3`.
+- `src/lib/auth.ts` (nuovo): configurazione Auth.js — adapter Drizzle su `users`/`sessions`/`verification_tokens`, sessioni `database`, provider `Nodemailer` (id `"email"`) con `sendVerificationRequest` che usa ancora `ConsoleEmailProvider` in sviluppo, callback `authorized` che protegge i path `/app/*`.
+- `src/db/schema/identity.ts`: rinominate le proprietà JS `emailVerifiedAt` → `emailVerified` (users) e `expiresAt` → `expires` (sessions, verification_tokens) per farle combaciare con le chiavi attese dall'adapter Drizzle di Auth.js. Nessuna migrazione: i nomi colonna DB sono invariati. La tabella `accounts` resta con le colonne esistenti (non ancora nella forma OAuth di Auth.js) perché non è mai toccata dal flusso solo-email; viene castata esplicitamente al momento di passarla all'adapter.
+- `src/app/api/auth/[...nextauth]/route.ts` (nuovo): espone gli handler `GET`/`POST` di Auth.js.
+- `src/proxy.ts` (nuovo): sostituisce il vecchio concetto di `middleware.ts` (deprecato in questa versione di Next.js, rinominato `proxy.ts` — vedi `node_modules/next/dist/docs/.../proxy.md`); protegge `/app/:path*` delegando alla callback `authorized`.
+- `src/modules/identity/identity-service.ts` (nuovo): `authIdentityService`, implementazione reale di `IdentityService` sopra Auth.js; esportato da `src/modules/identity/index.ts`.
+- `src/app/(auth)/login/actions.ts`: `requestMagicLink` ora chiama `signIn("email", …)` invece di limitarsi a loggare l'email.
+- `src/components/shared/user-menu-actions.ts` (nuovo) + `user-menu.tsx`: la voce "Esci" del menu utente ora invoca `authIdentityService.signOut()` invece di essere disabilitata.
+- Documentazione aggiornata: `docs/architecture/authentication-boundary.md` (stato reale), `docs/audit/open-risks.md` (rischio chiuso, nuovi rischi residui annotati).
+
+**File coinvolti**: `package.json`, `pnpm-lock.yaml`, `src/lib/auth.ts`, `src/db/schema/identity.ts`, `src/app/api/auth/[...nextauth]/route.ts`, `src/proxy.ts`, `src/modules/identity/*`, `src/app/(auth)/login/actions.ts`, `src/components/shared/user-menu.tsx`, `src/components/shared/user-menu-actions.ts`, `docs/architecture/authentication-boundary.md`, `docs/audit/open-risks.md`.
+
+**Decisioni**: vedi `docs/audit/decisions.md` (voce 2026-08-09).
+
+**Rischi aperti**: autorizzazione a livello di tenant (le pagine `(app)` usano ancora `getDemoTenant()`), autorizzazione basata su ruolo, rate limiting sul flusso magic-link, invio email reale (Resend) non ancora collegato. Vedi `docs/audit/open-risks.md`.
+
+**Verifica live**: `pnpm dev` + Playwright (`pnpm test:e2e`, 18/18 verdi) contro il database Docker locale. Percorsi verificati: `/app/*` non autenticato → redirect a `/login`; richiesta magic-link reale (email loggata da `ConsoleEmailProvider`); sessione iniettata direttamente in `sessions` per i test autenticati; sign out → redirect a `/login` e nuova richiesta a `/app` nuovamente reindirizzata. `pnpm typecheck`/`lint`/`format:check`/`test` (40/40 Vitest) tutti verdi.
+
+**Bug pre-esistente trovato e corretto durante la verifica**: `UserMenu` (`src/components/shared/user-menu.tsx`) usava `DropdownMenuLabel` fuori da un `DropdownMenuGroup` — base-ui lancia `"MenuGroupContext is missing"` non appena il menu viene aperto, mai emerso prima perché nessun test/Playwright apriva effettivamente il menu utente (la voce "Esci" era `disabled`). Corretto avvolgendo label + separator + item in `DropdownMenuGroup`.
+
+**Nota tecnica**: il `signOut` di Auth.js con `redirectTo` lancia internamente un redirect; invocato da un `onClick` su una voce di menu che si chiude (smonta) al click, il redirect rischia di degenerare in un errore non gestito invece che in una navigazione. `authIdentityService.signOut()` usa quindi `redirect: false` e lascia il redirect al chiamante lato client (`UserMenu`, via `useRouter().push("/login")` dopo che l'azione è risolta).

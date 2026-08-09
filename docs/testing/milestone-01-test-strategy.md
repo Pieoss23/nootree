@@ -26,14 +26,17 @@ All'avvio della suite (`beforeAll`), lo schema `public` del database di test vie
 
 ## Cosa copre la suite Vitest unitaria
 
-Variabili d'ambiente (`src/config/env.test.ts`), normalizzazione email/codice fiscale (`src/lib/normalize.test.ts`), mapping ruoli (`src/modules/memberships/roles.test.ts`), definizione piani/feature/limiti (`src/config/plans.test.ts`), utility monetarie (`src/modules/billing/money.test.ts`), componente `UsageMeter` (`src/components/shared/usage-meter.test.tsx`).
+Variabili d'ambiente (`src/config/env.test.ts`), normalizzazione email/codice fiscale (`src/lib/normalize.test.ts`), mapping ruoli (`src/modules/memberships/roles.test.ts`), definizione piani/feature/limiti (`src/config/plans.test.ts`), utility monetarie (`src/modules/billing/money.test.ts`), componente `UsageMeter` (`src/components/shared/usage-meter.test.tsx`), guardia di autorizzazione delle rotte `/app/*` (`src/lib/auth-authorization.test.ts` — tenuta priva di import di `next-auth` così è testabile senza avviare Auth.js, vedi `docs/architecture/authentication-boundary.md`).
 
 ## Cosa copre Playwright
 
-Landing page, login (con l'avviso "modalità sviluppo"), dashboard Oggi, pagina Pazienti, pagina non trovata, navigazione desktop (sidebar) e navigazione mobile (menu a sheet). Esclude qualunque flusso Stripe o di autenticazione reale, perché non esistono ancora.
+Landing page, login (con l'avviso "modalità sviluppo"), dashboard Oggi, pagina Pazienti, pagina non trovata, navigazione desktop (sidebar), navigazione mobile (menu a sheet), redirect a `/login` per visitatori non autenticati su `/app/*`, sign out. Esclude ancora qualunque flusso Stripe, perché non esiste.
+
+Per i test che richiedono un utente autenticato, `tests-e2e/helpers/auth.ts` inserisce direttamente una riga in `sessions` per l'owner demo seedato e imposta il cookie `authjs.session-token`, invece di passare dal flusso magic-link reale (che richiederebbe leggere lo stdout del dev server, non accessibile al processo di test).
 
 ## Cosa manca volutamente
 
 - Nessun test per flussi non implementati (checkout Stripe, invio email reale, CRUD pazienti, inviti team).
+- Nessun test E2E che completi il flusso magic-link end-to-end cliccando il link reale (richiederebbe intercettare l'email/lo stdout del server); la sessione per i test autenticati viene creata direttamente nel database, vedi sopra.
 - Nessun test di carico/performance.
 - Copertura di codice non misurata numericamente in questa milestone; l'obiettivo era coprire i confini critici (isolamento tenant, validazione ambiente, entitlement), non raggiungere una percentuale.

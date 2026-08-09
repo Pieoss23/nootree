@@ -10,7 +10,7 @@ export class ConsoleEmailProvider implements EmailProvider {
   async send(input: SendEmailInput): Promise<SendEmailResult> {
     const id = `dev-${Date.now()}`;
     console.warn(
-      `[notifications] DEV MODE — email not actually sent.\n  to: ${input.to}\n  subject: ${input.subject}\n  id: ${id}`,
+      `[notifications] DEV MODE — email not actually sent.\n  to: ${input.to}\n  subject: ${input.subject}\n  id: ${id}\n  html: ${input.html}`,
     );
     return { id };
   }

@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { signInAsDemoOwner } from "./helpers/auth";
 
 test.describe("smoke", () => {
   test("landing page renders and links to login", async ({ page }) => {
@@ -16,6 +17,22 @@ test.describe("smoke", () => {
     await expect(page.getByText(/modalità sviluppo/i)).toBeVisible();
   });
 
+  test("unauthenticated visitors to /app are redirected to /login", async ({ page }) => {
+    await page.goto("/app/patients");
+    await expect(page).toHaveURL(/\/login/);
+  });
+
+  test("not-found page is shown for an unknown route", async ({ page }) => {
+    await page.goto("/this-page-does-not-exist");
+    await expect(page.getByText("Pagina non trovata")).toBeVisible();
+  });
+});
+
+test.describe("authenticated", () => {
+  test.beforeEach(async ({ page }) => {
+    await signInAsDemoOwner(page);
+  });
+
   test("dashboard (Oggi) shows the demo tenant and greeting", async ({ page }) => {
     await page.goto("/app");
     await expect(page.getByRole("heading", { name: /^Ciao,/ })).toBeVisible();
@@ -28,13 +45,21 @@ test.describe("smoke", () => {
     await expect(page.getByRole("cell", { name: "Anna Bianchi" })).toBeVisible();
   });
 
-  test("not-found page is shown for an unknown route", async ({ page }) => {
-    await page.goto("/this-page-does-not-exist");
-    await expect(page.getByText("Pagina non trovata")).toBeVisible();
+  test("sign out ends the session and /app redirects to /login again", async ({ page }) => {
+    await page.goto("/app");
+    await page.locator('[data-slot="dropdown-menu-trigger"]').click();
+    await page.getByText("Esci", { exact: true }).click();
+    await expect(page).toHaveURL(/\/login/);
+    await page.goto("/app");
+    await expect(page).toHaveURL(/\/login/);
   });
 });
 
 test.describe("navigation", () => {
+  test.beforeEach(async ({ page }) => {
+    await signInAsDemoOwner(page);
+  });
+
   test("desktop: sidebar navigation switches pages", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto("/app");

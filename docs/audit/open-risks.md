@@ -4,9 +4,10 @@ Consolidato al termine della milestone (2026-07-31). Vedi `docs/product/mileston
 
 ## Rischi di sicurezza
 
-- **Nessuna autenticazione reale**: tutte le rotte `/app/*` sono pubblicamente raggiungibili, nessuna sessione esiste. Accettabile solo perché non ci sono dati reali (solo seed di sviluppo). **Deve essere chiuso prima di qualsiasi deploy pubblico.**
+- ~~**Nessuna autenticazione reale**~~ — chiuso il 2026-08-09: Auth.js è collegato (sessioni database-backed, magic-link reale, `/app/*` protette da `src/proxy.ts`). Vedi `docs/architecture/authentication-boundary.md`. Resta però **nessuna autorizzazione a livello di tenant**: l'utente autenticato non è ancora legato al tenant/membership corretto — le pagine `(app)` usano ancora `getDemoTenant()`. **Deve essere chiuso prima di qualsiasi deploy pubblico.**
 - **Nessuna autorizzazione basata su ruolo** applicata a un'azione reale (i mapping esistono in `src/modules/memberships/roles.ts` ma non sono ancora collegati a un enforcement).
-- **Nessun rate limiting** su alcun endpoint (rilevante soprattutto per il futuro flusso magic-link).
+- **Nessun rate limiting** su alcun endpoint (rilevante soprattutto per il flusso magic-link, ora reale).
+- In sviluppo l'invio email del magic-link passa ancora da `ConsoleEmailProvider` (logga invece di inviare) — va sostituito con l'adapter Resend reale prima della produzione.
 
 ## Debito tecnico
 
@@ -16,7 +17,7 @@ Consolidato al termine della milestone (2026-07-31). Vedi `docs/product/mileston
 
 ## Funzionalità solo predisposte (interfaccia definita, implementazione reale assente)
 
-- `IdentityService` — nessuna implementazione (Auth.js non collegato).
+- ~~`IdentityService` — nessuna implementazione (Auth.js non collegato).~~ Implementato il 2026-08-09 (`authIdentityService`, backed by Auth.js).
 - `TenantResolver` / `MembershipChecker` — nessuna implementazione.
 - `BillingProvider` — nessuna implementazione (Stripe non collegato); nessun endpoint webhook.
 - Invio email reale — solo `ConsoleEmailProvider` (logga, non invia).

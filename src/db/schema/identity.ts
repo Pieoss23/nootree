@@ -2,14 +2,19 @@ import { pgTable, text, timestamp, uuid, primaryKey } from "drizzle-orm/pg-core"
 
 /**
  * Core identity tables, shaped to be compatible with the Auth.js Drizzle
- * adapter so the passwordless flow (Milestone 1.1) can be wired in without a
- * schema migration. The `identity` domain module never imports Auth.js
- * directly — these tables are infrastructure, not the domain contract.
+ * adapter (see `src/lib/auth.ts`). The `identity` domain module never
+ * imports Auth.js directly — these tables are infrastructure, not the
+ * domain contract. `accounts` is unused by the current magic-link-only
+ * flow; its column names follow Auth.js's OAuth token-storage convention
+ * for when a real OAuth provider is added.
  */
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
   email: text("email").notNull().unique(),
-  emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
+  // JS property named `emailVerified` (not `emailVerifiedAt`) to match the
+  // Auth.js Drizzle adapter's expected column key; the DB column name is
+  // unaffected, so this is not a migration.
+  emailVerified: timestamp("email_verified_at", { withTimezone: true }),
   name: text("name"),
   image: text("image"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -42,18 +47,22 @@ export const sessions = pgTable("sessions", {
   userId: uuid("user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
-  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  // JS property named `expires` (not `expiresAt`) to match the Auth.js
+  // Drizzle adapter's expected column key; the DB column name is unaffected.
+  expires: timestamp("expires_at", { withTimezone: true }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-// Backs both the Auth.js verification-token flow and the future magic-link
-// login: a single-use token tied to an identifier (the email address).
+// Backs the Auth.js magic-link login flow: a single-use token tied to an
+// identifier (the email address).
 export const verificationTokens = pgTable(
   "verification_tokens",
   {
     identifier: text("identifier").notNull(),
     token: text("token").notNull(),
-    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    // JS property named `expires` (not `expiresAt`) to match the Auth.js
+    // Drizzle adapter's expected column key; the DB column name is unaffected.
+    expires: timestamp("expires_at", { withTimezone: true }).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [primaryKey({ columns: [table.identifier, table.token] })],
