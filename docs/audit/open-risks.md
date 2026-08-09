@@ -4,22 +4,24 @@ Consolidato al termine della milestone (2026-07-31). Vedi `docs/product/mileston
 
 ## Rischi di sicurezza
 
-- ~~**Nessuna autenticazione reale**~~ — chiuso il 2026-08-09: Auth.js è collegato (sessioni database-backed, magic-link reale, `/app/*` protette da `src/proxy.ts`). Vedi `docs/architecture/authentication-boundary.md`. Resta però **nessuna autorizzazione a livello di tenant**: l'utente autenticato non è ancora legato al tenant/membership corretto — le pagine `(app)` usano ancora `getDemoTenant()`. **Deve essere chiuso prima di qualsiasi deploy pubblico.**
-- **Nessuna autorizzazione basata su ruolo** applicata a un'azione reale (i mapping esistono in `src/modules/memberships/roles.ts` ma non sono ancora collegati a un enforcement).
+- ~~**Nessuna autenticazione reale**~~ — chiuso il 2026-08-09: Auth.js è collegato (sessioni database-backed, magic-link reale, `/app/*` protette da `src/proxy.ts`). Vedi `docs/architecture/authentication-boundary.md`.
+- ~~**Nessuna autorizzazione a livello di tenant**~~ — chiuso il 2026-08-09: `tenantResolver.resolveActiveTenant()` (`src/modules/tenancy/resolver.ts`) verifica una vera membership `ACTIVE` prima di risolvere un `tenantId`, invocato da `getActiveTenant()` (`src/lib/active-tenant.ts`) su ogni pagina `(app)` e ogni server action di scrittura. `src/lib/demo-tenant.ts` è stato rimosso.
+- **Nessuna autorizzazione basata su ruolo** applicata a un'azione reale: `TenantContext.role` è ora disponibile (risolto da `tenantResolver`), ma nessuna server action lo controlla ancora — `createPatientAction`/`updatePatientAction`/`setPatientStatusAction` accettano qualunque ruolo (`OWNER`/`NUTRITIONIST`/`ASSISTANT`) con membership attiva. I mapping esistono in `src/modules/memberships/roles.ts` (`roleAtLeast`) ma non sono collegati a un enforcement.
 - **Nessun rate limiting** su alcun endpoint (rilevante soprattutto per il flusso magic-link, ora reale).
 - In sviluppo l'invio email del magic-link passa ancora da `ConsoleEmailProvider` (logga invece di inviare) — va sostituito con l'adapter Resend reale prima della produzione.
 
 ## Debito tecnico
 
-- `src/lib/demo-tenant.ts` è un placeholder esplicito che bypassa la risoluzione tenant reale — va rimosso in Milestone 1.1, non deve convivere con `TenantResolver`. Le scritture pazienti (`src/app/(app)/app/patients/actions.ts`) dipendono ancora da questo bypass per il `tenantId`; quando `TenantResolver` sarà implementato, andrà aggiornato anche lì.
+- ~~`src/lib/demo-tenant.ts` è un placeholder esplicito...~~ Rimosso il 2026-08-09.
 - Il pulsante "Apri Customer Portal" è disabilitato con tooltip: nessuna azione reale dietro (Stripe non collegato).
 - ~~`assertWithinLimit` (entitlements) richiede che il chiamante fornisca `currentUsage`... nessun punto di enforcement automatico.~~ Chiuso il 2026-08-09: `createPatientAction` chiama `assertFeature`/`assertWithinLimit` prima di ogni creazione paziente.
-- **Nessuna autorizzazione per ruolo sulle scritture pazienti**: `createPatientAction`/`updatePatientAction`/`setPatientStatusAction` richiedono solo una sessione valida (`authIdentityService.requireUser()`), non verificano ancora il ruolo dell'utente nel tenant (dipende da `TenantResolver`/`MembershipChecker`, non implementati).
+- **Nessuna autorizzazione per ruolo sulle scritture pazienti** (vedi sopra, sezione sicurezza).
+- `resolveActiveTenant` sceglie la membership più vecchia come "tenant attivo" quando un utente ne ha più di una — non c'è ancora un'interfaccia per cambiare tenant attivo. Vedi `docs/architecture/multi-tenancy.md`.
 
 ## Funzionalità solo predisposte (interfaccia definita, implementazione reale assente)
 
 - ~~`IdentityService` — nessuna implementazione (Auth.js non collegato).~~ Implementato il 2026-08-09 (`authIdentityService`, backed by Auth.js).
-- `TenantResolver` / `MembershipChecker` — nessuna implementazione.
+- ~~`TenantResolver` / `MembershipChecker` — nessuna implementazione.~~ Implementati il 2026-08-09 (`src/modules/tenancy/resolver.ts`). `membershipChecker.verifyMembership` non ha ancora un chiamante reale (nessuna UI di switch tenant in questa milestone), ma è testato.
 - `BillingProvider` — nessuna implementazione (Stripe non collegato); nessun endpoint webhook.
 - Invio email reale — solo `ConsoleEmailProvider` (logga, non invia).
 

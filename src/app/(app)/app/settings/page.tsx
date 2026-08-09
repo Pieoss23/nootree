@@ -2,12 +2,12 @@ import { PageHeader } from "@/components/shared";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { getDemoTenant } from "@/lib/demo-tenant";
+import { getActiveTenant } from "@/lib/active-tenant";
 
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
-  const tenant = await getDemoTenant();
+  const tenant = await getActiveTenant();
   if (!tenant) return null;
 
   return (
@@ -23,11 +23,11 @@ export default async function SettingsPage() {
           <CardContent className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="owner-name">Nome</Label>
-              <Input id="owner-name" defaultValue={tenant.ownerName} disabled />
+              <Input id="owner-name" defaultValue={tenant.userName} disabled />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="owner-email">Email</Label>
-              <Input id="owner-email" defaultValue={tenant.ownerEmail} disabled />
+              <Input id="owner-email" defaultValue={tenant.userEmail} disabled />
             </div>
           </CardContent>
         </Card>

@@ -15,7 +15,7 @@ src/
 ├── proxy.ts                    # Protegge /app/* (rotta "middleware", rinominata in questa versione di Next.js)
 ├── modules/                    # Domini di business
 │   ├── identity/                 # IdentityService + authIdentityService (Auth.js, vedi src/lib/auth.ts)
-│   ├── tenancy/                   # TenantContext, TenantResolver, MembershipChecker (non implementati)
+│   ├── tenancy/                   # TenantContext + tenantResolver/membershipChecker (resolver.ts, implementati)
 │   ├── memberships/                # Repository + mapping ruoli (implementato)
 │   ├── billing/                    # BillingProvider, money utils, repository subscription (implementato in lettura)
 │   ├── entitlements/                # hasFeature/assertFeature/getResourceLimit/assertWithinLimit (implementato)
@@ -41,7 +41,8 @@ src/
 ├── lib/
 │   ├── auth.ts                  # Configurazione Auth.js (adapter, provider email, callback authorized)
 │   ├── auth-authorization.ts    # Guardia /app/* pura, senza import di next-auth (testabile in isolamento)
-│   └── utils.ts (cn), normalize.ts, logger.ts, demo-tenant.ts (temporaneo, vedi sotto)
+│   ├── active-tenant.ts         # DAL: requireUser() + tenantResolver, cache() per richiesta — vedi multi-tenancy.md
+│   └── utils.ts (cn), normalize.ts, logger.ts
 ├── tests/                       # Setup Vitest + test di integrazione database
 └── styles/ (globals.css è in src/app)
 
@@ -50,7 +51,7 @@ tests-e2e/                       # Playwright (smoke, auth, CRUD pazienti) + hel
 
 ## Note
 
-- `src/lib/demo-tenant.ts` è un **placeholder temporaneo**: risolve sempre il tenant demo seedato, bypassando sessione e membership. Va rimosso quando la Milestone 1.1 introduce la risoluzione tenant reale (`TenantResolver`). Le server action di scrittura (es. `src/app/(app)/app/patients/actions.ts`) dipendono ancora da questo bypass per il `tenantId`.
+- `src/lib/demo-tenant.ts` è stato **rimosso il 2026-08-09**: la risoluzione tenant è ora reale (`getActiveTenant()` → `tenantResolver.resolveActiveTenant()`), vedi `docs/architecture/multi-tenancy.md`.
 - Un modulo in `src/modules/*` può evolvere verso `domain/ application/ infrastructure/ presentation/ index.ts` quando la complessità lo giustifica; in questa milestone la maggior parte resta piatta perché non ce n'è ancora bisogno.
 - I componenti UI/server action specifici di una pagina (es. il dialog e la tabella pazienti) vivono nella cartella della route sotto `src/app/`, non nel modulo di dominio corrispondente, per non far dipendere `src/modules/*` da `src/app/*`. Il modulo espone solo tipi, repository e validazione.
 - Non sono state create cartelle vuote: ogni cartella presente contiene codice, un'interfaccia o un barrel export.

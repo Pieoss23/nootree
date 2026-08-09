@@ -7,7 +7,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { getDemoTenant } from "@/lib/demo-tenant";
+import { getActiveTenant } from "@/lib/active-tenant";
 import { listMembershipsByTenant, getRoleLabel } from "@/modules/memberships";
 
 export const dynamic = "force-dynamic";
@@ -25,7 +25,7 @@ const STATUS_LABEL = {
 } as const;
 
 export default async function TeamPage() {
-  const tenant = await getDemoTenant();
+  const tenant = await getActiveTenant();
   if (!tenant) return null;
 
   const memberships = await listMembershipsByTenant(tenant.tenantId);

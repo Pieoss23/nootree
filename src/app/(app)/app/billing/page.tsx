@@ -3,7 +3,7 @@ import { PageHeader, StatusBadge, UsageMeter } from "@/components/shared";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { getDemoTenant } from "@/lib/demo-tenant";
+import { getActiveTenant } from "@/lib/active-tenant";
 import { getActiveSubscriptionForTenant } from "@/modules/billing";
 import { countActivePatients } from "@/modules/patients";
 import { getResourceLimit } from "@/modules/entitlements";
@@ -12,7 +12,7 @@ import { PLAN_DEFINITIONS, FEATURE_DEFINITIONS, RESOURCE_KEYS } from "@/config/p
 export const dynamic = "force-dynamic";
 
 export default async function BillingPage() {
-  const tenant = await getDemoTenant();
+  const tenant = await getActiveTenant();
   if (!tenant) return null;
 
   const [subscription, activePatients, patientLimit] = await Promise.all([

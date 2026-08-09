@@ -13,6 +13,7 @@ import {
   updatePatient,
   setPatientStatus,
 } from "@/modules/patients";
+import { tenantResolver, membershipChecker } from "@/modules/tenancy";
 
 /**
  * Exercises the database against TEST_DATABASE_URL only — never the
@@ -325,6 +326,108 @@ describe.skipIf(!testDatabaseUrl)("database integration", () => {
     });
     expect(reactivated?.status).toBe("ACTIVE");
     expect(reactivated?.archivedAt).toBeNull();
+  });
+
+  it("resolveActiveTenant returns the tenant for a user's only active membership", async () => {
+    const [tenant] = await db
+      .insert(schema.tenants)
+      .values({ name: "Resolver Tenant", slug: `resolver-${randomUUID()}` })
+      .returning();
+    const [user] = await db
+      .insert(schema.users)
+      .values({ email: `resolver-${randomUUID()}@example.test` })
+      .returning();
+    await db.insert(schema.memberships).values({
+      tenantId: tenant.id,
+      userId: user.id,
+      role: "OWNER",
+      status: "ACTIVE",
+    });
+
+    const context = await tenantResolver.resolveActiveTenant({
+      id: user.id,
+      email: user.email,
+      name: null,
+      image: null,
+    });
+
+    expect(context?.tenantId).toBe(tenant.id);
+    expect(context?.role).toBe("OWNER");
+  });
+
+  it("resolveActiveTenant returns null for a user with no active membership", async () => {
+    const [user] = await db
+      .insert(schema.users)
+      .values({ email: `no-membership-${randomUUID()}@example.test` })
+      .returning();
+
+    const context = await tenantResolver.resolveActiveTenant({
+      id: user.id,
+      email: user.email,
+      name: null,
+      image: null,
+    });
+
+    expect(context).toBeNull();
+  });
+
+  it("resolveActiveTenant ignores a SUSPENDED membership", async () => {
+    const [tenant] = await db
+      .insert(schema.tenants)
+      .values({ name: "Suspended Tenant", slug: `suspended-${randomUUID()}` })
+      .returning();
+    const [user] = await db
+      .insert(schema.users)
+      .values({ email: `suspended-${randomUUID()}@example.test` })
+      .returning();
+    await db.insert(schema.memberships).values({
+      tenantId: tenant.id,
+      userId: user.id,
+      role: "ASSISTANT",
+      status: "SUSPENDED",
+    });
+
+    const context = await tenantResolver.resolveActiveTenant({
+      id: user.id,
+      email: user.email,
+      name: null,
+      image: null,
+    });
+
+    expect(context).toBeNull();
+  });
+
+  it("verifyMembership returns null for a user not in that tenant", async () => {
+    const [tenantA] = await db
+      .insert(schema.tenants)
+      .values({ name: "Membership Check A", slug: `membership-check-a-${randomUUID()}` })
+      .returning();
+    const [tenantB] = await db
+      .insert(schema.tenants)
+      .values({ name: "Membership Check B", slug: `membership-check-b-${randomUUID()}` })
+      .returning();
+    const [user] = await db
+      .insert(schema.users)
+      .values({ email: `membership-check-${randomUUID()}@example.test` })
+      .returning();
+    await db.insert(schema.memberships).values({
+      tenantId: tenantA.id,
+      userId: user.id,
+      role: "OWNER",
+      status: "ACTIVE",
+    });
+
+    const validMembership = await membershipChecker.verifyMembership({
+      userId: user.id,
+      tenantId: tenantA.id,
+    });
+    expect(validMembership?.tenantId).toBe(tenantA.id);
+
+    const crossTenantMembership = await membershipChecker.verifyMembership({
+      userId: user.id,
+      tenantId: tenantB.id,
+    });
+    expect(crossTenantMembership).toBeNull();
   });
 
   it("cascades tenant deletion to its memberships (not silently orphaned)", async () => {

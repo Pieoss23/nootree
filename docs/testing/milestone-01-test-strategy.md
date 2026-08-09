@@ -22,6 +22,8 @@ All'avvio della suite (`beforeAll`), lo schema `public` del database di test vie
 - vincolo di unicità webhook event `(provider, providerEventId)`;
 - lettura pazienti (`listPatientsByTenant`, `getPatientById`) filtrata esplicitamente per tenant, incluso un tentativo di lettura cross-tenant che deve restituire `null`;
 - scrittura pazienti (`createPatient`, `updatePatient`, `setPatientStatus`): la riga creata è scoperta al tenant giusto, un `updatePatient` con il `tenantId` sbagliato restituisce `null` e non modifica nulla, `setPatientStatus` archivia/riattiva valorizzando/azzerando `archivedAt`;
+- `tenantResolver.resolveActiveTenant`: risolve la membership `ACTIVE` di un utente, restituisce `null` se non ce n'è nessuna, ignora una membership `SUSPENDED`;
+- `membershipChecker.verifyMembership`: conferma una membership valida nel tenant giusto, restituisce `null` per un tentativo cross-tenant;
 - rifiuto di valori enum non validi (`role`) a livello database;
 - cascata `ON DELETE CASCADE` da `tenants` a `memberships`.
 
@@ -31,14 +33,15 @@ Variabili d'ambiente (`src/config/env.test.ts`), normalizzazione email/codice fi
 
 ## Cosa copre Playwright
 
-Landing page, login (con l'avviso "modalità sviluppo"), dashboard Oggi, pagina Pazienti, pagina non trovata, navigazione desktop (sidebar), navigazione mobile (menu a sheet), redirect a `/login` per visitatori non autenticati su `/app/*`, sign out, CRUD pazienti (`tests-e2e/patients-crud.spec.ts`: crea, modifica, archivia, riattiva; blocca un'email non valida mostrando l'errore di campo). Esclude ancora qualunque flusso Stripe, perché non esiste.
+Landing page, login (con l'avviso "modalità sviluppo"), dashboard Oggi, pagina Pazienti, pagina Abbonamento, pagina Impostazioni (mostra nome/email dell'utente autenticato, non sempre il titolare), pagina non trovata, navigazione desktop (sidebar), navigazione mobile (menu a sheet), redirect a `/login` per visitatori non autenticati su `/app/*`, sign out, CRUD pazienti (`tests-e2e/patients-crud.spec.ts`: crea, modifica, archivia, riattiva; blocca un'email non valida mostrando l'errore di campo), stato "nessuno studio associato" per un utente autenticato senza membership attiva. Esclude ancora qualunque flusso Stripe, perché non esiste.
 
-Per i test che richiedono un utente autenticato, `tests-e2e/helpers/auth.ts` inserisce direttamente una riga in `sessions` per l'owner demo seedato e imposta il cookie `authjs.session-token`, invece di passare dal flusso magic-link reale (che richiederebbe leggere lo stdout del dev server, non accessibile al processo di test).
+Per i test che richiedono un utente autenticato, `tests-e2e/helpers/auth.ts` inserisce direttamente una riga in `sessions` (per l'owner demo seedato, o per un nuovo utente senza membership) e imposta il cookie `authjs.session-token`, invece di passare dal flusso magic-link reale (che richiederebbe leggere lo stdout del dev server, non accessibile al processo di test).
 
 ## Cosa manca volutamente
 
 - Nessun test per flussi non implementati (checkout Stripe, invio email reale, inviti team).
 - Nessun test che verifichi l'autorizzazione per ruolo sulle scritture pazienti (non ancora implementata — vedi `docs/audit/open-risks.md`).
+- Nessun test per lo switch tra tenant quando un utente ha più membership (nessuna UI per farlo in questa milestone).
 - Nessun test E2E che completi il flusso magic-link end-to-end cliccando il link reale (richiederebbe intercettare l'email/lo stdout del server); la sessione per i test autenticati viene creata direttamente nel database, vedi sopra.
 - Nessun test di carico/performance.
 - Copertura di codice non misurata numericamente in questa milestone; l'obiettivo era coprire i confini critici (isolamento tenant, validazione ambiente, entitlement), non raggiungere una percentuale.

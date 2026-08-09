@@ -1,8 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getDemoTenant } from "@/lib/demo-tenant";
-import { authIdentityService } from "@/modules/identity";
+import { getActiveTenant } from "@/lib/active-tenant";
 import {
   createPatient,
   updatePatient,
@@ -53,8 +52,8 @@ export async function createPatientAction(
   _prevState: PatientFormState,
   formData: FormData,
 ): Promise<PatientFormState> {
-  const tenant = await getDemoTenant();
-  if (!tenant) return { status: "error", message: "Tenant non trovato." };
+  const tenant = await getActiveTenant();
+  if (!tenant) return { status: "error", message: "Nessuno studio associato al tuo account." };
 
   const parsed = parseForm(formData);
   if (!parsed.success) {
@@ -66,7 +65,6 @@ export async function createPatientAction(
   }
 
   try {
-    const actor = await authIdentityService.requireUser();
     await assertFeature(tenant.tenantId, "patients.management");
     const activePatients = await countActivePatients(tenant.tenantId);
     await assertWithinLimit(tenant.tenantId, "activePatients", activePatients);
@@ -75,7 +73,7 @@ export async function createPatientAction(
 
     await recordAuditEvent({
       tenantId: tenant.tenantId,
-      actorUserId: actor.id,
+      actorUserId: tenant.userId,
       action: "patient.created",
       entityType: "patient",
       entityId: patient.id,
@@ -106,8 +104,8 @@ export async function updatePatientAction(
     return { status: "error", message: "Paziente non valido." };
   }
 
-  const tenant = await getDemoTenant();
-  if (!tenant) return { status: "error", message: "Tenant non trovato." };
+  const tenant = await getActiveTenant();
+  if (!tenant) return { status: "error", message: "Nessuno studio associato al tuo account." };
 
   const parsed = parseForm(formData);
   if (!parsed.success) {
@@ -118,13 +116,12 @@ export async function updatePatientAction(
     };
   }
 
-  const actor = await authIdentityService.requireUser();
   const patient = await updatePatient({ tenantId: tenant.tenantId, patientId, ...parsed.data });
   if (!patient) return { status: "error", message: "Paziente non trovato." };
 
   await recordAuditEvent({
     tenantId: tenant.tenantId,
-    actorUserId: actor.id,
+    actorUserId: tenant.userId,
     action: "patient.updated",
     entityType: "patient",
     entityId: patient.id,
@@ -141,16 +138,15 @@ export async function setPatientStatusAction(formData: FormData): Promise<void> 
     throw new Error("Invalid setPatientStatusAction input.");
   }
 
-  const tenant = await getDemoTenant();
+  const tenant = await getActiveTenant();
   if (!tenant) return;
 
-  const actor = await authIdentityService.requireUser();
   const patient = await setPatientStatus({ tenantId: tenant.tenantId, patientId, status });
   if (!patient) return;
 
   await recordAuditEvent({
     tenantId: tenant.tenantId,
-    actorUserId: actor.id,
+    actorUserId: tenant.userId,
     action: status === "ARCHIVED" ? "patient.archived" : "patient.reactivated",
     entityType: "patient",
     entityId: patient.id,

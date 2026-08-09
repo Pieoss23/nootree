@@ -1,12 +1,12 @@
 import { PatientsPageClient } from "./patients-page-client";
-import { getDemoTenant } from "@/lib/demo-tenant";
+import { getActiveTenant } from "@/lib/active-tenant";
 import { countActivePatients, listPatientsByTenant } from "@/modules/patients";
 import { getResourceLimit } from "@/modules/entitlements";
 
 export const dynamic = "force-dynamic";
 
 export default async function PatientsPage() {
-  const tenant = await getDemoTenant();
+  const tenant = await getActiveTenant();
   if (!tenant) return null;
 
   const [patients, activePatients, patientLimit] = await Promise.all([

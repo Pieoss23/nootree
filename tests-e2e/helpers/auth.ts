@@ -14,6 +14,27 @@ const DEMO_OWNER_EMAIL = "owner@demo.nootree.dev";
 // see src/lib/auth.ts and the "database" session strategy.
 const SESSION_COOKIE_NAME = "authjs.session-token";
 
+async function setSessionCookie(page: Page, sessionToken: string): Promise<void> {
+  await page.context().addCookies([
+    {
+      name: SESSION_COOKIE_NAME,
+      value: sessionToken,
+      url: "http://localhost:3000",
+      httpOnly: true,
+      sameSite: "Lax",
+    },
+  ]);
+}
+
+function connectToDevDatabase() {
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
+    throw new Error("DATABASE_URL is not set — required by the e2e sign-in helpers.");
+  }
+  const sql = postgres(connectionString);
+  return { sql, db: drizzle(sql) };
+}
+
 /**
  * Signs a Playwright page in as the seeded demo owner by inserting a real
  * Auth.js database session row directly, then setting the session cookie.
@@ -21,14 +42,8 @@ const SESSION_COOKIE_NAME = "authjs.session-token";
  * server's console output — not available to the test process.
  */
 export async function signInAsDemoOwner(page: Page): Promise<void> {
-  const connectionString = process.env.DATABASE_URL;
-  if (!connectionString) {
-    throw new Error("DATABASE_URL is not set — required by the e2e sign-in helper.");
-  }
-
-  const sql = postgres(connectionString);
+  const { sql, db } = connectToDevDatabase();
   try {
-    const db = drizzle(sql);
     const [user] = await db
       .select({ id: users.id })
       .from(users)
@@ -43,16 +58,28 @@ export async function signInAsDemoOwner(page: Page): Promise<void> {
     const sessionToken = randomUUID();
     const expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
     await db.insert(sessions).values({ sessionToken, userId: user.id, expires });
+    await setSessionCookie(page, sessionToken);
+  } finally {
+    await sql.end();
+  }
+}
 
-    await page.context().addCookies([
-      {
-        name: SESSION_COOKIE_NAME,
-        value: sessionToken,
-        url: "http://localhost:3000",
-        httpOnly: true,
-        sameSite: "Lax",
-      },
-    ]);
+/**
+ * Signs a Playwright page in as a brand-new user with no membership in any
+ * tenant, to exercise the "no active tenant" state (src/lib/active-tenant.ts).
+ */
+export async function signInAsUserWithNoMembership(page: Page): Promise<void> {
+  const { sql, db } = connectToDevDatabase();
+  try {
+    const [user] = await db
+      .insert(users)
+      .values({ email: `e2e-no-membership-${randomUUID()}@example.test` })
+      .returning();
+
+    const sessionToken = randomUUID();
+    const expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await db.insert(sessions).values({ sessionToken, userId: user.id, expires });
+    await setSessionCookie(page, sessionToken);
   } finally {
     await sql.end();
   }

@@ -3,7 +3,7 @@ import { CheckCircle2, Circle } from "lucide-react";
 import { PageHeader, UsageMeter, StatusBadge } from "@/components/shared";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
-import { getDemoTenant } from "@/lib/demo-tenant";
+import { getActiveTenant } from "@/lib/active-tenant";
 import { countActivePatients, listPatientsByTenant } from "@/modules/patients";
 import { getResourceLimit } from "@/modules/entitlements";
 import { getActiveSubscriptionForTenant } from "@/modules/billing";
@@ -19,7 +19,7 @@ const ONBOARDING_STEPS = [
 ];
 
 export default async function TodayPage() {
-  const tenant = await getDemoTenant();
+  const tenant = await getActiveTenant();
   if (!tenant) return null;
 
   const [activePatients, patientLimit, recentPatients, subscription] = await Promise.all([
@@ -32,7 +32,7 @@ export default async function TodayPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        title={`Ciao, ${tenant.ownerName.split(" ")[0]}`}
+        title={`Ciao, ${tenant.userName.split(" ")[0]}`}
         description={tenant.tenantName}
       />
 

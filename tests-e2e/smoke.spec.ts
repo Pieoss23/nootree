@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { signInAsDemoOwner } from "./helpers/auth";
+import { signInAsDemoOwner, signInAsUserWithNoMembership } from "./helpers/auth";
 
 test.describe("smoke", () => {
   test("landing page renders and links to login", async ({ page }) => {
@@ -45,6 +45,18 @@ test.describe("authenticated", () => {
     await expect(page.getByRole("cell", { name: "Anna Bianchi", exact: true })).toBeVisible();
   });
 
+  test("billing page shows the active subscription", async ({ page }) => {
+    await page.goto("/app/billing");
+    await expect(page.getByRole("heading", { name: "Abbonamento" })).toBeVisible();
+    await expect(page.getByText("Professional")).toBeVisible();
+  });
+
+  test("settings page shows the signed-in user's own name and email", async ({ page }) => {
+    await page.goto("/app/settings");
+    await expect(page.getByRole("heading", { name: "Impostazioni" })).toBeVisible();
+    await expect(page.getByLabel("Email")).toHaveValue("owner@demo.nootree.dev");
+  });
+
   test("sign out ends the session and /app redirects to /login again", async ({ page }) => {
     await page.goto("/app");
     await page.locator('[data-slot="dropdown-menu-trigger"]').click();
@@ -52,6 +64,16 @@ test.describe("authenticated", () => {
     await expect(page).toHaveURL(/\/login/);
     await page.goto("/app");
     await expect(page).toHaveURL(/\/login/);
+  });
+});
+
+test.describe("tenant resolution", () => {
+  test("a user with no active membership sees the no-tenant state, not another tenant's data", async ({
+    page,
+  }) => {
+    await signInAsUserWithNoMembership(page);
+    await page.goto("/app");
+    await expect(page.getByText("Nessuno studio associato")).toBeVisible();
   });
 });
 

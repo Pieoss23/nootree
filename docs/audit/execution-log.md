@@ -118,3 +118,25 @@ Ogni voce riporta: data/ora, fase, obiettivo, modifiche, file coinvolti, decisio
 **Decisioni**: vedi `docs/audit/decisions.md` (voce 2026-08-09 — CRUD pazienti).
 
 **Rischi aperti**: autorizzazione per ruolo sulle scritture pazienti (dipende da `TenantResolver`/`MembershipChecker`, non implementati), rate limiting, invio email reale. Vedi `docs/audit/open-risks.md`.
+
+---
+
+## 2026-08-09 — Milestone 1.1 — TenantResolver reale, rimozione di `demo-tenant.ts`
+
+**Obiettivo**: chiudere il rischio "nessuna autorizzazione a livello di tenant" implementando `TenantResolver`/`MembershipChecker` e rimuovendo il bypass `src/lib/demo-tenant.ts`, come indicato in `docs/audit/open-risks.md` e `docs/architecture/multi-tenancy.md`.
+
+**Modifiche**:
+
+- `src/modules/tenancy/resolver.ts` (nuovo): `tenantResolver.resolveActiveTenant(user)` interroga `memberships` per `(userId, status = 'ACTIVE')`; un utente con più tenant ottiene deterministicamente la membership più vecchia (nessuna UI di switch tenant in questa milestone — vedi `docs/architecture/multi-tenancy.md`). `membershipChecker.verifyMembership({ userId, tenantId })` verifica una membership specifica, indipendente da quale sia "attiva"; non ha ancora un chiamante nell'app, solo test.
+- `src/lib/active-tenant.ts` (nuovo): `getActiveTenant()`, la Data Access Layer che ogni pagina `(app)` e ogni server action ora chiamano al posto di `getDemoTenant()`. Combina `authIdentityService.requireUser()` + `tenantResolver.resolveActiveTenant()` + i dati del tenant per l'UI, avvolta in `React.cache()` (dedup per richiesta, mai tra richieste diverse — pattern raccomandato in `node_modules/next/dist/docs/01-app/02-guides/authentication.md`, sezione "Creating a Data Access Layer"). Ritorna `null` se l'utente autenticato non ha nessuna membership attiva (caso reale: invito non ancora accettato, non solo "seed mancante").
+- `src/lib/demo-tenant.ts` **rimosso**. Aggiornati tutti gli 8 punti che lo chiamavano: `layout.tsx`, `page.tsx` (Oggi), `patients/page.tsx`, `patients/actions.ts`, `team/page.tsx`, `billing/page.tsx`, `settings/page.tsx`.
+- Effetto collaterale positivo: `tenant.ownerName`/`ownerEmail` (sempre il titolare, indipendentemente da chi era loggato — non c'era altra scelta senza sessione reale) sono diventati `tenant.userName`/`userEmail` (l'utente effettivamente autenticato). La pagina Impostazioni ora mostra correttamente "i tuoi dati", non sempre quelli del titolare. `patients/actions.ts` usa `tenant.userId` come `actorUserId` per l'audit invece di una `requireUser()` separata e non verificata contro il tenant.
+- `layout.tsx`: il messaggio per "nessun tenant" è passato da "Tenant demo non trovato" (invitava a rilanciare il seed) a "Nessuno studio associato" (riflette un caso reale: utente autenticato ma senza membership).
+
+**File coinvolti**: `src/modules/tenancy/*`, `src/lib/active-tenant.ts`, `src/lib/demo-tenant.ts` (rimosso), le 7 pagine/azioni sopra elencate, `src/tests/db.integration.test.ts`, `tests-e2e/helpers/auth.ts` (nuovo `signInAsUserWithNoMembership`), `tests-e2e/smoke.spec.ts`, `docs/architecture/multi-tenancy.md`, `docs/architecture/project-structure.md`, `docs/audit/open-risks.md`.
+
+**Verifica live**: `pnpm dev` + Playwright (`pnpm test:e2e`, 28/28 verdi — aggiunti test per billing/settings, mai coperti prima, e per lo stato "nessuno studio associato" con un utente senza membership). `pnpm typecheck`/`lint`/`format:check`/`test` (54/54 Vitest, inclusi i nuovi test di integrazione DB per `resolveActiveTenant`/`verifyMembership`) tutti verdi.
+
+**Decisioni**: vedi `docs/audit/decisions.md` (voce 2026-08-09 — TenantResolver).
+
+**Rischi aperti**: autorizzazione per ruolo sulle scritture (role è ora disponibile ma non ancora controllato in nessuna server action), switch tra tenant per utenti con più membership, rate limiting, billing Stripe, invio email reale. Vedi `docs/audit/open-risks.md`.

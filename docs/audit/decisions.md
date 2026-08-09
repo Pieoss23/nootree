@@ -90,3 +90,21 @@ Elenco delle decisioni architetturali e operative prese durante la Milestone 1, 
 **Decisione**: il form paziente ha l'attributo `noValidate`; tutta la validazione (incluso il formato email) passa da `patientFormSchema` (Zod) eseguito nella server action, con gli errori per campo rimandati al client e mostrati inline.
 
 **Motivazione**: senza `noValidate`, la validazione nativa del browser su `<input type="email">` impediva l'invio del form per email non valide, quindi il percorso di errore lato server non era mai raggiungibile (scoperto scrivendo il test Playwright corrispondente — vedi `docs/audit/execution-log.md`). Con un'unica fonte di verità gli errori mostrati sono sempre coerenti con quanto verrà effettivamente salvato.
+
+---
+
+## 2026-08-09 — "Tenant attivo" = membership più vecchia, nessuno switch tenant
+
+**Decisione**: `tenantResolver.resolveActiveTenant(user)` sceglie la membership `ACTIVE` con `createdAt` minore, quando un utente ne ha più di una. Non esiste un cookie/parametro per scegliere quale tenant è "attivo".
+
+**Motivazione**: questa milestone non ha (ed esplicitamente non include, vedi `docs/product/milestone-01-scope.md`) inviti al team o un'interfaccia di switch tenant, quindi ogni utente demo ha al più una membership. Una scelta deterministica e semplice è corretta finché non serve altro, ed è testata (`db.integration.test.ts`) così il comportamento è esplicito, non un effetto collaterale dell'ordine delle righe in DB.
+
+**Alternative scartate**: cookie/query param per il tenant attivo — prematuro senza UI per impostarlo, e un `tenantId` lato client andrebbe comunque riverificato con `membershipChecker.verifyMembership` prima di fidarsene (vedi `docs/security/tenant-isolation-rules.md`).
+
+---
+
+## 2026-08-09 — `getActiveTenant()` come Data Access Layer condivisa, con `React.cache()`
+
+**Decisione**: invece di far chiamare `authIdentityService` + `tenantResolver` separatamente a ogni pagina/azione, `src/lib/active-tenant.ts` espone un'unica `getActiveTenant()` cached con `React.cache()`.
+
+**Motivazione**: ogni pagina `(app)` e il layout devono risolvere lo stesso tenant per la stessa richiesta; senza `cache()`, ognuna rifarebbe la query di sessione e quella di membership. `React.cache()` deduplica entro lo stesso render pass senza bisogno di prop-drilling o Context (che comunque non funzionerebbe nei Server Component). Pattern raccomandato esplicitamente da questa versione di Next.js per la Data Access Layer di autenticazione/autorizzazione (`node_modules/next/dist/docs/01-app/02-guides/authentication.md`). La cache non attraversa le Server Action: ogni scrittura riverifica sessione e membership da zero, come deve essere per un'operazione che muta dati.
