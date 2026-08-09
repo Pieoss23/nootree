@@ -2,7 +2,7 @@ import "server-only";
 import { and, count, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { patients } from "@/db/schema";
-import type { Patient, PatientStatus } from "./types";
+import type { ActivityLevel, NutritionGoal, Patient, PatientStatus } from "./types";
 
 /**
  * Every query here takes `tenantId` explicitly and filters by it — never
@@ -87,6 +87,37 @@ export async function updatePatient(
       birthDate: input.birthDate,
       fiscalCode: input.fiscalCode,
       internalNotes: input.internalNotes,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(patients.tenantId, input.tenantId), eq(patients.id, input.patientId)))
+    .returning();
+
+  return row ?? null;
+}
+
+export type ClinicalWriteFields = {
+  allergiesIntolerances: string | null;
+  pathologies: string | null;
+  medications: string | null;
+  nutritionGoal: NutritionGoal | null;
+  activityLevel: ActivityLevel | null;
+  healthDataConsentAt: Date | null;
+};
+
+/** Separate from `updatePatient` on purpose: keeps the core anagrafica CRUD
+ * (identity fields) untouched by clinical-data changes. */
+export async function updatePatientClinicalInfo(
+  input: { tenantId: string; patientId: string } & ClinicalWriteFields,
+): Promise<Patient | null> {
+  const [row] = await db
+    .update(patients)
+    .set({
+      allergiesIntolerances: input.allergiesIntolerances,
+      pathologies: input.pathologies,
+      medications: input.medications,
+      nutritionGoal: input.nutritionGoal,
+      activityLevel: input.activityLevel,
+      healthDataConsentAt: input.healthDataConsentAt,
       updatedAt: new Date(),
     })
     .where(and(eq(patients.tenantId, input.tenantId), eq(patients.id, input.patientId)))

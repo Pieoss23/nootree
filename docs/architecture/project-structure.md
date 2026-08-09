@@ -7,7 +7,10 @@ src/
 │   ├── (auth)/login/           # Login passwordless (Auth.js reale)
 │   ├── (app)/app/              # Shell gestionale, protetta da src/proxy.ts
 │   │   └── patients/             # actions.ts, patient-form-dialog.tsx, patients-page-client.tsx,
-│   │                              # patients-table.tsx — UI + server action del CRUD pazienti
+│   │       │                      # patients-table.tsx — UI + server action del CRUD pazienti
+│   │       └── [id]/               # Pagina di dettaglio paziente (prima dynamic route dell'app):
+│   │                                # anamnesi clinica (clinical-info-*) + storico misurazioni/BIA
+│   │                                # (measurement-*, measurements-*), actions.ts a parte
 │   ├── api/health/             # Health check
 │   ├── api/auth/[...nextauth]/ # Handler Auth.js (GET/POST re-esportati da src/lib/auth.ts)
 │   ├── error.tsx, global-error.tsx, not-found.tsx
@@ -19,7 +22,8 @@ src/
 │   ├── memberships/                # Repository + mapping ruoli (implementato)
 │   ├── billing/                    # BillingProvider, money utils, repository subscription (implementato in lettura)
 │   ├── entitlements/                # hasFeature/assertFeature/getResourceLimit/assertWithinLimit (implementato)
-│   ├── patients/                     # Repository CRUD (tipi/scritture; l'UI vive in src/app/(app)/app/patients/)
+│   ├── patients/                     # Repository CRUD + anamnesi clinica + misurazioni/BIA (tipi/scritture;
+│   │                                   # l'UI vive in src/app/(app)/app/patients/)
 │   ├── audit/                        # recordAuditEvent, append-only (implementato)
 │   └── notifications/                # EmailProvider + ConsoleEmailProvider (dev-only)
 ├── components/
@@ -46,7 +50,7 @@ src/
 ├── tests/                       # Setup Vitest + test di integrazione database
 └── styles/ (globals.css è in src/app)
 
-tests-e2e/                       # Playwright (smoke, auth, CRUD pazienti) + helpers/auth.ts (login via sessione iniettata)
+tests-e2e/                       # Playwright (smoke, auth, CRUD pazienti, dettaglio paziente) + helpers/auth.ts (login via sessione iniettata)
 ```
 
 ## Note

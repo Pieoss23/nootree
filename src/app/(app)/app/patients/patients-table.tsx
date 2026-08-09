@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { Search, MoreHorizontal } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -119,7 +120,9 @@ export function PatientsTable({ patients }: PatientsTableProps) {
             {filtered.map((patient) => (
               <TableRow key={patient.id}>
                 <TableCell className="font-medium text-foreground">
-                  {patient.firstName} {patient.lastName}
+                  <Link href={`/app/patients/${patient.id}`} className="hover:underline">
+                    {patient.firstName} {patient.lastName}
+                  </Link>
                 </TableCell>
                 <TableCell className="text-muted-foreground">{patient.email ?? "—"}</TableCell>
                 <TableCell className="text-muted-foreground">{patient.phone ?? "—"}</TableCell>

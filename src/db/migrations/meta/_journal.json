@@ -8,6 +8,13 @@
       "when": 1785525022623,
       "tag": "0000_military_nekra",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1786306387582,
+      "tag": "0001_powerful_surge",
+      "breakpoints": true
     }
   ]
 }

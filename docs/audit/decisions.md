@@ -121,6 +121,36 @@ Elenco delle decisioni architetturali e operative prese durante la Milestone 1, 
 
 ---
 
+## 2026-08-09 — Anagrafica clinica pazienti + misurazioni: `numeric` invece del pattern "centesimi interi"
+
+**Decisione**: le colonne antropometriche/BIA di `patient_measurements` (peso, altezza, circonferenze, massa grassa/magra, acqua corporea, angolo di fase) usano Postgres `numeric(precisione, scala, { mode: "number" })` — non il pattern "integer in unità minima" (es. grammi) usato per i soldi in `billing.ts`.
+
+**Motivazione**: il pattern "centesimi interi" per i soldi esiste per fare aritmetica esatta (somme, moltiplicazioni) senza errori di arrotondamento float — ma le misurazioni non vengono mai sommate o moltiplicate in questa milestone, solo mostrate e (in futuro) graficate. `numeric` con `mode: "number"` (confermato nei type declaration di `drizzle-orm`) memorizza il valore decimale esatto in Postgres e lo restituisce come `number` JS nativo in lettura, senza dover inventare unità minime diverse per ogni campo (grammi per il peso, decimi di grado per l'angolo di fase, ecc.), che avrebbe reso il codice più complesso senza un reale beneficio in questo caso d'uso.
+
+**Alternative scartate**: integer in unità minima (come i soldi) — scartato perché aggiunge complessità (conversioni per ogni campo) senza il vantaggio che ha per i soldi (nessuna somma/moltiplicazione da proteggere da errori di arrotondamento).
+
+---
+
+## 2026-08-09 — Consenso dati sanitari (GDPR art. 9): preservato, non ricalcolato ad ogni salvataggio
+
+**Decisione**: `healthDataConsentAt` (timestamp nullable su `patients`) viene impostato a `new Date()` solo quando la checkbox passa da non spuntata a spuntata; se era già spuntata (consenso preesistente), il valore esistente viene preservato passandolo tramite un campo hidden nel form (`existingConsentAt`), letto dalla riga paziente già in memoria sulla pagina di dettaglio — nessuna query aggiuntiva. Se la checkbox viene tolta, il valore torna a `null` (revocato).
+
+**Motivazione**: il timestamp deve significare "quando il paziente ha dato il consenso", non "quando questo form è stato salvato l'ultima volta". Ricalcolarlo a `now()` ad ogni save con la checkbox spuntata (alternativa più semplice da implementare, senza bisogno del campo hidden) avrebbe reso il dato fuorviante — ogni modifica non correlata alle allergie o all'obiettivo avrebbe silenziosamente spostato in avanti la data di un consenso mai rinnovato davvero.
+
+**Alternative scartate**: rileggere la riga paziente nella server action prima di scrivere, invece di passare il valore preesistente via campo hidden — evitato per mantenere `updatePatientClinicalInfo` strutturalmente identica a `updatePatient` (nessuna query di lettura nel percorso di scrittura). Accettato il compromesso che un campo hidden è manipolabile lato client: l'attore qui è personale dello studio già autenticato e autorizzato (stesso confine di fiducia di ogni altro campo del form, es. `internalNotes`), non il paziente stesso — non un caso di tamper-proofing verso un attore non fidato.
+
+---
+
+## 2026-08-09 — Misurazioni pazienti: aggiunta ed eliminazione, non modifica
+
+**Decisione**: `patient_measurements` espone `createMeasurement`/`deleteMeasurement` ma non un `updateMeasurement`. Una pesata inserita per errore si cancella (hard delete) e si reinserisce.
+
+**Motivazione**: a differenza dei pazienti (dove l'archiviazione preserva un'anagrafica che ha valore anche disattivata), una misurazione è una riga di log inserita a mano — l'eliminazione e reinserimento è più semplice di un endpoint di modifica con la stessa validazione di quello di creazione, e non c'è un requisito di audit trail sul valore precedente in questa milestone (a differenza del consenso GDPR, dove la data conta).
+
+**Alternative scartate**: endpoint di modifica in-place — scartato per ora come complessità non giustificata dal caso d'uso; annotato in `docs/audit/open-risks.md` come scelta esplicita, da rivedere se emerge un bisogno reale di preservare lo storico delle correzioni.
+
+---
+
 ## 2026-08-09 — Autorizzazione per ruolo: stessa soglia (`ASSISTANT`) per tutte le scritture pazienti
 
 **Decisione**: `createPatientAction`/`updatePatientAction`/`setPatientStatusAction` richiedono `assertRole(tenant.role, "ASSISTANT")` — poiché `ASSISTANT` è il rank minimo esistente, questo equivale in pratica a "qualunque membership attiva può scrivere sui pazienti", identico al comportamento precedente. La differenza è che ora è un controllo esplicito e testato (`src/modules/memberships/authorization.ts`), non un'assenza di controllo.

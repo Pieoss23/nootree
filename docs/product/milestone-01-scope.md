@@ -31,4 +31,6 @@ Le seguenti aree hanno solo l'interfaccia/contratto e, dove utile, dati o lettur
 
 ## Esplicitamente fuori scope
 
-Invio reale di magic link, autenticazione completa, checkout Stripe reale, Customer Portal, webhook Stripe completi, CRUD pazienti completo, inviti del team, agenda, appuntamenti, visite, misurazioni, anamnesi, patologie, piani alimentari, alimenti, ricette, documenti clinici, portale paziente, contabilità, fatturazione elettronica, Sistema Tessera Sanitaria, intelligenza artificiale.
+Invio reale di magic link, autenticazione completa, checkout Stripe reale, Customer Portal, webhook Stripe completi, CRUD pazienti completo, inviti del team, agenda, appuntamenti, visite, piani alimentari, alimenti, ricette, documenti clinici, portale paziente, contabilità, fatturazione elettronica, Sistema Tessera Sanitaria, intelligenza artificiale.
+
+Nota: "misurazioni" e "anamnesi/patologie" erano elencate qui come fuori scope — implementate in Milestone 1.2 (2026-08-09), vedi `docs/audit/execution-log.md`. Allegati/file (referti, foto) e catalogo prodotti/ingredienti restano fuori scope.

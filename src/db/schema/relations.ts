@@ -11,7 +11,7 @@ import {
   subscriptions,
   subscriptionItems,
 } from "./billing";
-import { patients } from "./patients";
+import { patients, patientMeasurements } from "./patients";
 
 export const usersRelations = relations(users, ({ many }) => ({
   accounts: many(accounts),
@@ -97,6 +97,12 @@ export const subscriptionItemsRelations = relations(subscriptionItems, ({ one })
   }),
 }));
 
-export const patientsRelations = relations(patients, ({ one }) => ({
+export const patientsRelations = relations(patients, ({ one, many }) => ({
   tenant: one(tenants, { fields: [patients.tenantId], references: [tenants.id] }),
+  measurements: many(patientMeasurements),
+}));
+
+export const patientMeasurementsRelations = relations(patientMeasurements, ({ one }) => ({
+  tenant: one(tenants, { fields: [patientMeasurements.tenantId], references: [tenants.id] }),
+  patient: one(patients, { fields: [patientMeasurements.patientId], references: [patients.id] }),
 }));

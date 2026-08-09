@@ -12,6 +12,9 @@ import {
   createPatient,
   updatePatient,
   setPatientStatus,
+  updatePatientClinicalInfo,
+  listMeasurementsByPatient,
+  createMeasurement,
 } from "@/modules/patients";
 import { tenantResolver, membershipChecker } from "@/modules/tenancy";
 
@@ -428,6 +431,122 @@ describe.skipIf(!testDatabaseUrl)("database integration", () => {
       tenantId: tenantB.id,
     });
     expect(crossTenantMembership).toBeNull();
+  });
+
+  it("updatePatientClinicalInfo refuses to update a patient belonging to another tenant", async () => {
+    const [tenantA] = await db
+      .insert(schema.tenants)
+      .values({ name: "Clinical Tenant A", slug: `clinical-a-${randomUUID()}` })
+      .returning();
+    const [tenantB] = await db
+      .insert(schema.tenants)
+      .values({ name: "Clinical Tenant B", slug: `clinical-b-${randomUUID()}` })
+      .returning();
+
+    const patient = await createPatient({
+      tenantId: tenantA.id,
+      firstName: "Anamnesi",
+      lastName: "Paziente",
+      email: null,
+      phone: null,
+      birthDate: null,
+      fiscalCode: null,
+      internalNotes: null,
+    });
+
+    const crossTenantUpdate = await updatePatientClinicalInfo({
+      tenantId: tenantB.id,
+      patientId: patient.id,
+      allergiesIntolerances: "Glutine",
+      pathologies: null,
+      medications: null,
+      nutritionGoal: null,
+      activityLevel: null,
+      healthDataConsentAt: null,
+    });
+    expect(crossTenantUpdate).toBeNull();
+
+    const untouched = await getPatientById({ tenantId: tenantA.id, patientId: patient.id });
+    expect(untouched?.allergiesIntolerances).toBeNull();
+
+    const sameTenantUpdate = await updatePatientClinicalInfo({
+      tenantId: tenantA.id,
+      patientId: patient.id,
+      allergiesIntolerances: "Glutine",
+      pathologies: null,
+      medications: null,
+      nutritionGoal: "WEIGHT_LOSS",
+      activityLevel: "MODERATE",
+      healthDataConsentAt: null,
+    });
+    expect(sameTenantUpdate?.allergiesIntolerances).toBe("Glutine");
+    expect(sameTenantUpdate?.nutritionGoal).toBe("WEIGHT_LOSS");
+  });
+
+  it("scopes measurements to the requested tenant and orders by measuredAt", async () => {
+    const [tenantA] = await db
+      .insert(schema.tenants)
+      .values({ name: "Measurements Tenant A", slug: `measurements-a-${randomUUID()}` })
+      .returning();
+    const [tenantB] = await db
+      .insert(schema.tenants)
+      .values({ name: "Measurements Tenant B", slug: `measurements-b-${randomUUID()}` })
+      .returning();
+
+    const patient = await createPatient({
+      tenantId: tenantA.id,
+      firstName: "Misurato",
+      lastName: "Paziente",
+      email: null,
+      phone: null,
+      birthDate: null,
+      fiscalCode: null,
+      internalNotes: null,
+    });
+
+    const measurementFields = {
+      heightCm: null,
+      waistCm: null,
+      hipCm: null,
+      armCm: null,
+      bodyFatPercent: null,
+      bodyWaterPercent: null,
+      leanMassKg: null,
+      cellMassKg: null,
+      phaseAngle: null,
+      basalMetabolicRateKcal: null,
+      notes: null,
+    };
+
+    await createMeasurement({
+      tenantId: tenantA.id,
+      patientId: patient.id,
+      measuredAt: "2026-02-01",
+      weightKg: 80,
+      ...measurementFields,
+    });
+    await createMeasurement({
+      tenantId: tenantA.id,
+      patientId: patient.id,
+      measuredAt: "2026-01-01",
+      weightKg: 82,
+      ...measurementFields,
+    });
+
+    const measurementsForA = await listMeasurementsByPatient({
+      tenantId: tenantA.id,
+      patientId: patient.id,
+    });
+    expect(measurementsForA).toHaveLength(2);
+    expect(measurementsForA[0].measuredAt).toBe("2026-01-01");
+    expect(measurementsForA[0].weightKg).toBe(82);
+    expect(measurementsForA[1].measuredAt).toBe("2026-02-01");
+
+    const measurementsForB = await listMeasurementsByPatient({
+      tenantId: tenantB.id,
+      patientId: patient.id,
+    });
+    expect(measurementsForB).toHaveLength(0);
   });
 
   it("cascades tenant deletion to its memberships (not silently orphaned)", async () => {
