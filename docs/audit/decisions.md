@@ -108,3 +108,13 @@ Elenco delle decisioni architetturali e operative prese durante la Milestone 1, 
 **Decisione**: invece di far chiamare `authIdentityService` + `tenantResolver` separatamente a ogni pagina/azione, `src/lib/active-tenant.ts` espone un'unica `getActiveTenant()` cached con `React.cache()`.
 
 **Motivazione**: ogni pagina `(app)` e il layout devono risolvere lo stesso tenant per la stessa richiesta; senza `cache()`, ognuna rifarebbe la query di sessione e quella di membership. `React.cache()` deduplica entro lo stesso render pass senza bisogno di prop-drilling o Context (che comunque non funzionerebbe nei Server Component). Pattern raccomandato esplicitamente da questa versione di Next.js per la Data Access Layer di autenticazione/autorizzazione (`node_modules/next/dist/docs/01-app/02-guides/authentication.md`). La cache non attraversa le Server Action: ogni scrittura riverifica sessione e membership da zero, come deve essere per un'operazione che muta dati.
+
+---
+
+## 2026-08-09 — Selezione del provider email a runtime (`getEmailProvider`), fail loud in produzione
+
+**Decisione**: `getEmailProvider(env)` (`src/modules/notifications/email-provider-factory.ts`) sceglie `ResendEmailProvider` quando `RESEND_API_KEY`/`RESEND_FROM_EMAIL` sono entrambe presenti, altrimenti `ConsoleEmailProvider` — tranne quando `NODE_ENV === "production"`, dove l'assenza di configurazione Resend lancia un errore invece di ripiegare silenziosamente su Console. La funzione prende `env` come parametro invece di importare il singleton `@/config/env`, seguendo lo stesso pattern di `validateServerEnv`.
+
+**Motivazione**: `ConsoleEmailProvider` non deve mai essere usato in produzione (vedi il suo stesso commento e `docs/architecture/authentication-boundary.md`); un semplice `if (RESEND_API_KEY) ... else Console` senza il caso produzione avrebbe permesso a un deploy mal configurato di "funzionare" silenziosamente senza mai inviare email. Prendere `env` come parametro rende la logica di selezione testabile in isolamento (`email-provider-factory.test.ts`) senza dover impostare/mockare variabili d'ambiente reali.
+
+**Verifica**: testato con una chiave Resend fittizia (selezione del provider corretto in dev/prod, errore in produzione senza configurazione) — **non testato con una chiave Resend reale**, non disponibile in questo ambiente. Vedi `docs/audit/open-risks.md`.

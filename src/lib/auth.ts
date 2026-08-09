@@ -4,7 +4,7 @@ import Nodemailer from "next-auth/providers/nodemailer";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import { db } from "@/db";
 import { users, accounts, sessions, verificationTokens } from "@/db/schema";
-import { ConsoleEmailProvider } from "@/modules/notifications";
+import { getEmailProvider } from "@/modules/notifications";
 import { env } from "@/config/env";
 import { isAppRouteAuthorized } from "./auth-authorization";
 
@@ -40,15 +40,18 @@ export const config = {
     Nodemailer({
       id: "email",
       name: "Email",
+      // Unused by our sendVerificationRequest below — the real "from"
+      // address is RESEND_FROM_EMAIL, read inside getEmailProvider().
       from: "login@nootree.local",
       // Required by the Nodemailer provider factory even though it's never
       // used: `sendVerificationRequest` below is fully overridden and never
       // calls `createTransport`.
       server: { host: "localhost", port: 1025 },
       async sendVerificationRequest({ identifier, url }) {
-        // Dev-only: swap for the real Resend-backed EmailProvider once
-        // notifications go live (see docs/architecture/authentication-boundary.md).
-        const provider = new ConsoleEmailProvider();
+        // Resend when RESEND_API_KEY/RESEND_FROM_EMAIL are set, otherwise
+        // ConsoleEmailProvider in development — see
+        // src/modules/notifications/email-provider-factory.ts.
+        const provider = getEmailProvider(env);
         await provider.send({
           to: identifier,
           subject: "Il tuo link di accesso a nootree",

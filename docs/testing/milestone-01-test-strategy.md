@@ -29,7 +29,7 @@ All'avvio della suite (`beforeAll`), lo schema `public` del database di test vie
 
 ## Cosa copre la suite Vitest unitaria
 
-Variabili d'ambiente (`src/config/env.test.ts`), normalizzazione email/codice fiscale (`src/lib/normalize.test.ts`), mapping ruoli (`src/modules/memberships/roles.test.ts`), definizione piani/feature/limiti (`src/config/plans.test.ts`), utility monetarie (`src/modules/billing/money.test.ts`), componente `UsageMeter` (`src/components/shared/usage-meter.test.tsx`), guardia di autorizzazione delle rotte `/app/*` (`src/lib/auth-authorization.test.ts` — tenuta priva di import di `next-auth` così è testabile senza avviare Auth.js, vedi `docs/architecture/authentication-boundary.md`), schema di validazione pazienti (`src/modules/patients/validation.test.ts` — normalizzazione, email/data non valide).
+Variabili d'ambiente (`src/config/env.test.ts`), normalizzazione email/codice fiscale (`src/lib/normalize.test.ts`), mapping ruoli (`src/modules/memberships/roles.test.ts`), definizione piani/feature/limiti (`src/config/plans.test.ts`), utility monetarie (`src/modules/billing/money.test.ts`), componente `UsageMeter` (`src/components/shared/usage-meter.test.tsx`), guardia di autorizzazione delle rotte `/app/*` (`src/lib/auth-authorization.test.ts` — tenuta priva di import di `next-auth` così è testabile senza avviare Auth.js, vedi `docs/architecture/authentication-boundary.md`), schema di validazione pazienti (`src/modules/patients/validation.test.ts` — normalizzazione, email/data non valide), selezione del provider email (`src/modules/notifications/email-provider-factory.test.ts` — Resend vs Console in base a env/`NODE_ENV`, errore in produzione senza configurazione; non invia email reali, testa solo la logica di scelta).
 
 ## Cosa copre Playwright
 
@@ -39,9 +39,10 @@ Per i test che richiedono un utente autenticato, `tests-e2e/helpers/auth.ts` ins
 
 ## Cosa manca volutamente
 
-- Nessun test per flussi non implementati (checkout Stripe, invio email reale, inviti team).
+- Nessun test per flussi non implementati (checkout Stripe, inviti team).
 - Nessun test che verifichi l'autorizzazione per ruolo sulle scritture pazienti (non ancora implementata — vedi `docs/audit/open-risks.md`).
 - Nessun test per lo switch tra tenant quando un utente ha più membership (nessuna UI per farlo in questa milestone).
 - Nessun test E2E che completi il flusso magic-link end-to-end cliccando il link reale (richiederebbe intercettare l'email/lo stdout del server); la sessione per i test autenticati viene creata direttamente nel database, vedi sopra.
+- Nessun invio reale tramite Resend testato con una chiave API vera — `ResendEmailProvider` non è mockato/testato oltre alla logica di selezione del provider (non disponibile una chiave Resend in questo ambiente). Vedi `docs/audit/open-risks.md`.
 - Nessun test di carico/performance.
 - Copertura di codice non misurata numericamente in questa milestone; l'obiettivo era coprire i confini critici (isolamento tenant, validazione ambiente, entitlement), non raggiungere una percentuale.

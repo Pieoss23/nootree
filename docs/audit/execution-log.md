@@ -140,3 +140,27 @@ Ogni voce riporta: data/ora, fase, obiettivo, modifiche, file coinvolti, decisio
 **Decisioni**: vedi `docs/audit/decisions.md` (voce 2026-08-09 — TenantResolver).
 
 **Rischi aperti**: autorizzazione per ruolo sulle scritture (role è ora disponibile ma non ancora controllato in nessuna server action), switch tra tenant per utenti con più membership, rate limiting, billing Stripe, invio email reale. Vedi `docs/audit/open-risks.md`.
+
+---
+
+## 2026-08-09 — Milestone 1.1 — Invio email reale (Resend)
+
+**Obiettivo**: sostituire `ConsoleEmailProvider` con un adapter Resend reale per il flusso magic-link, come indicato in `docs/audit/open-risks.md`.
+
+**Modifiche**:
+
+- Aggiunta la dipendenza `resend@6.18.1`.
+- `src/modules/notifications/resend-email-provider.ts` (nuovo): `ResendEmailProvider`, implementa `EmailProvider` sopra l'SDK ufficiale Resend (`client.emails.send`).
+- `src/modules/notifications/email-provider-factory.ts` (nuovo): `getEmailProvider(env)` sceglie `ResendEmailProvider` quando `RESEND_API_KEY`/`RESEND_FROM_EMAIL` sono configurate, altrimenti `ConsoleEmailProvider` — tranne in produzione, dove l'assenza di configurazione Resend lancia un errore invece di ripiegare silenziosamente su Console (vedi `docs/audit/decisions.md`).
+- `src/lib/auth.ts`: `sendVerificationRequest` ora chiama `getEmailProvider(env)` invece di istanziare `ConsoleEmailProvider` direttamente.
+- `.env.example`: commento aggiornato per riflettere che Resend è ora davvero collegato (opzionale in sviluppo, obbligatorio in produzione).
+
+**File coinvolti**: `package.json`, `pnpm-lock.yaml`, `src/modules/notifications/*`, `src/lib/auth.ts`, `.env.example`.
+
+**Verifica**: `pnpm typecheck`/`lint`/`format:check` puliti. 59/59 Vitest (aggiunto `email-provider-factory.test.ts`: seleziona Resend/Console in base a env e `NODE_ENV`, lancia in produzione senza configurazione). `pnpm test:e2e` 28/28 verdi — confermato che il flusso magic-link continua a funzionare in sviluppo (nessuna chiave Resend impostata → fallback a Console, come prima).
+
+**Non verificato**: invio reale tramite Resend con una chiave API vera — non disponibile in questo ambiente. Prima del primo deploy in produzione, verificare manualmente che un'email arrivi davvero. Vedi `docs/audit/open-risks.md`.
+
+**Decisioni**: vedi `docs/audit/decisions.md` (voce 2026-08-09 — Selezione del provider email).
+
+**Rischi aperti**: autorizzazione per ruolo, rate limiting (ora rilevante anche per costi Resend, non solo sicurezza), invio Resend non testato con chiave reale, billing Stripe, switch tra tenant. Vedi `docs/audit/open-risks.md`.
