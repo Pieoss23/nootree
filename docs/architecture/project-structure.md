@@ -21,15 +21,21 @@ src/
 │   │       └── [id]/                 # Dettaglio ricetta: ingredients-section/-table (aggiunta/rimozione
 │   │                                  # ingredienti da catalogo o prodotti tenant), nutrition-summary.tsx
 │   │                                  # (totali calcolati, non salvati), actions.ts a parte
+│   ├── admin/                   # Amministrazione piattaforma, sorella di (app)/app (NON annidata,
+│   │                              # non tenant-scoped): layout.tsx chiama requireSuperuser(), page.tsx
+│   │                              # lista tutti i tenant — vedi ADR 005
 │   ├── api/health/             # Health check
 │   ├── api/auth/[...nextauth]/ # Handler Auth.js (GET/POST re-esportati da src/lib/auth.ts)
 │   ├── error.tsx, global-error.tsx, not-found.tsx
 │   └── layout.tsx              # Root layout
-├── proxy.ts                    # Protegge /app/* (rotta "middleware", rinominata in questa versione di Next.js)
+├── proxy.ts                    # Protegge /app/* e /admin/* (rotta "middleware", rinominata in questa versione di Next.js)
 ├── modules/                    # Domini di business
 │   ├── identity/                 # IdentityService + authIdentityService (Auth.js, vedi src/lib/auth.ts)
 │   ├── tenancy/                   # TenantContext + tenantResolver/membershipChecker (resolver.ts, implementati)
 │   ├── memberships/                # Repository + mapping ruoli (implementato)
+│   ├── platform/                    # platformRole (SUPERUSER) cross-tenant, indipendente da memberships:
+│   │                                  # requireSuperuser(), assertPlatformRole, admin-repository.ts (unico
+│   │                                  # punto sanzionato per query senza filtro tenantId — vedi ADR 005)
 │   ├── billing/                    # BillingProvider, money utils, repository subscription (implementato in lettura)
 │   ├── entitlements/                # hasFeature/assertFeature/getResourceLimit/assertWithinLimit (implementato)
 │   ├── patients/                     # Repository CRUD + anamnesi clinica + misurazioni/BIA (tipi/scritture;

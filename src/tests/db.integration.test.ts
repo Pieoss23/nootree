@@ -32,6 +32,12 @@ import {
   createPatientRecipe,
   listPatientRecipes,
 } from "@/modules/recipes";
+// Direct file import, not the `@/modules/platform` barrel: the barrel also
+// re-exports `requireSuperuser` (service.ts), which pulls in Auth.js
+// transitively via @/modules/identity — that resolves fine inside Next.js
+// but not inside Vitest's environment. Same class of issue as the
+// server-only barrel gotcha, see docs/audit/open-risks.md.
+import { listAllTenants, listAllUsers } from "@/modules/platform/admin-repository";
 
 /**
  * Exercises the database against TEST_DATABASE_URL only — never the
@@ -772,5 +778,65 @@ describe.skipIf(!testDatabaseUrl)("database integration", () => {
       .from(schema.memberships)
       .where(eq(schema.memberships.tenantId, tenant.id));
     expect(remaining).toHaveLength(0);
+  });
+
+  it("listAllTenants returns rows across multiple tenants, with no tenantId filter", async () => {
+    const [tenantA] = await db
+      .insert(schema.tenants)
+      .values({ name: "Admin Overview A", slug: `admin-a-${randomUUID()}` })
+      .returning();
+    const [tenantB] = await db
+      .insert(schema.tenants)
+      .values({ name: "Admin Overview B", slug: `admin-b-${randomUUID()}` })
+      .returning();
+    const [userA] = await db
+      .insert(schema.users)
+      .values({ email: `admin-overview-${randomUUID()}@example.test` })
+      .returning();
+    await db.insert(schema.memberships).values({
+      tenantId: tenantA.id,
+      userId: userA.id,
+      role: "OWNER",
+      status: "ACTIVE",
+    });
+    const [actor] = await db
+      .insert(schema.users)
+      .values({ email: `admin-actor-${randomUUID()}@example.test`, platformRole: "SUPERUSER" })
+      .returning();
+
+    const overview = await listAllTenants(actor.id);
+    const overviewIds = overview.map((row) => row.id);
+
+    expect(overviewIds).toContain(tenantA.id);
+    expect(overviewIds).toContain(tenantB.id);
+    expect(overview.find((row) => row.id === tenantA.id)?.memberCount).toBe(1);
+    expect(overview.find((row) => row.id === tenantB.id)?.memberCount).toBe(0);
+
+    const [auditRow] = await db
+      .select()
+      .from(schema.auditEvents)
+      .where(eq(schema.auditEvents.action, "admin.tenants.list"))
+      .orderBy(sql`created_at desc`)
+      .limit(1);
+    expect(auditRow).toBeDefined();
+    expect(auditRow.actorUserId).toBe(actor.id);
+    expect(auditRow.tenantId).toBeNull();
+  });
+
+  it("listAllUsers includes a SUPERUSER with no tenant membership", async () => {
+    const [superuser] = await db
+      .insert(schema.users)
+      .values({
+        email: `admin-superuser-${randomUUID()}@example.test`,
+        platformRole: "SUPERUSER",
+      })
+      .returning();
+
+    const overview = await listAllUsers(superuser.id);
+    const row = overview.find((entry) => entry.id === superuser.id);
+
+    expect(row).toBeDefined();
+    expect(row?.platformRole).toBe("SUPERUSER");
+    expect(row?.membershipCount).toBe(0);
   });
 });

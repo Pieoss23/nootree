@@ -13,6 +13,10 @@ import { PLAN_DEFINITIONS, FEATURE_DEFINITIONS, type FeatureKey } from "@/config
 
 export const DEMO_TENANT_SLUG = "demo-studio";
 export const DEMO_OWNER_EMAIL = "owner@demo.nootree.dev";
+// Platform-level superuser (src/modules/platform/), deliberately not a member
+// of any tenant — under the "direct access, no impersonation" design (ADR
+// 005), a superuser doesn't need a membership to administer the platform.
+export const PLATFORM_ADMIN_EMAIL = "platform-admin@nootree.dev";
 
 export type SeedResult = {
   tenantId: string;
@@ -866,6 +870,16 @@ export async function seedDevelopmentData(
       );
     }
   }
+
+  // --- Platform superuser (no tenant membership, see ADR 005) -------------
+
+  await db
+    .insert(schema.users)
+    .values({ email: PLATFORM_ADMIN_EMAIL, name: "Platform Admin", platformRole: "SUPERUSER" })
+    .onConflictDoUpdate({
+      target: schema.users.email,
+      set: { name: "Platform Admin", platformRole: "SUPERUSER" },
+    });
 
   return {
     tenantId: tenant.id,

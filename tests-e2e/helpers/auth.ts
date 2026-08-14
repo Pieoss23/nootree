@@ -5,10 +5,11 @@ import postgres from "postgres";
 import type { Page } from "@playwright/test";
 import { users, sessions } from "../../src/db/schema";
 
-// Matches DEMO_OWNER_EMAIL in src/db/seed-core.ts. Not imported directly:
-// that module pulls in `@/config/plans` via the `@` alias, which Playwright's
-// runner doesn't resolve the way Vitest/Next.js do.
+// Matches DEMO_OWNER_EMAIL/PLATFORM_ADMIN_EMAIL in src/db/seed-core.ts. Not
+// imported directly: that module pulls in `@/config/plans` via the `@`
+// alias, which Playwright's runner doesn't resolve the way Vitest/Next.js do.
 const DEMO_OWNER_EMAIL = "owner@demo.nootree.dev";
+const PLATFORM_ADMIN_EMAIL = "platform-admin@nootree.dev";
 
 // Matches the Auth.js v5 default (non-secure, http) session cookie name —
 // see src/lib/auth.ts and the "database" session strategy.
@@ -52,6 +53,33 @@ export async function signInAsDemoOwner(page: Page): Promise<void> {
     if (!user) {
       throw new Error(
         `Seeded demo owner (${DEMO_OWNER_EMAIL}) not found — run \`pnpm db:seed\` first.`,
+      );
+    }
+
+    const sessionToken = randomUUID();
+    const expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await db.insert(sessions).values({ sessionToken, userId: user.id, expires });
+    await setSessionCookie(page, sessionToken);
+  } finally {
+    await sql.end();
+  }
+}
+
+/**
+ * Signs a Playwright page in as the seeded platform superuser
+ * (`platformRole: "SUPERUSER"`, no tenant membership) — see ADR 005.
+ */
+export async function signInAsPlatformAdmin(page: Page): Promise<void> {
+  const { sql, db } = connectToDevDatabase();
+  try {
+    const [user] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.email, PLATFORM_ADMIN_EMAIL))
+      .limit(1);
+    if (!user) {
+      throw new Error(
+        `Seeded platform admin (${PLATFORM_ADMIN_EMAIL}) not found — run \`pnpm db:seed\` first.`,
       );
     }
 

@@ -4,7 +4,7 @@ Schema definito in `src/db/schema/*`, migrazioni generate in `src/db/migrations/
 
 ## Identity (`src/db/schema/identity.ts`)
 
-- **users** — `id, email (unique), emailVerifiedAt, name, image, createdAt, updatedAt`.
+- **users** — `id, email (unique), emailVerifiedAt, name, image, platformRole (USER|SUPERUSER, default USER), createdAt, updatedAt`. `platformRole` è indipendente da `memberships.role` (per-tenant): `SUPERUSER` autorizza l'amministrazione cross-tenant in `src/modules/platform/` — vedi [ADR 005](./decisions/005-platform-superuser-role.md).
 - **accounts** — collegamenti OAuth futuri; chiave primaria composita `(provider, providerAccountId)`, coerente con la convenzione dell'adapter Drizzle di Auth.js.
 - **sessions** — `sessionToken (unique), userId, expiresAt`.
 - **verificationTokens** — `(identifier, token)` come chiave composita; userà per il flusso magic-link.

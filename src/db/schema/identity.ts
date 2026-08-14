@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid, primaryKey } from "drizzle-orm/pg-core";
+import { pgEnum, pgTable, text, timestamp, uuid, primaryKey } from "drizzle-orm/pg-core";
 
 /**
  * Core identity tables, shaped to be compatible with the Auth.js Drizzle
@@ -8,6 +8,13 @@ import { pgTable, text, timestamp, uuid, primaryKey } from "drizzle-orm/pg-core"
  * flow; its column names follow Auth.js's OAuth token-storage convention
  * for when a real OAuth provider is added.
  */
+
+// Platform-level access, orthogonal to per-tenant `memberships.role`. See
+// ADR 005 and src/modules/platform/ — SUPERUSER bypasses tenant isolation
+// entirely, so this is deliberately a separate concept, not another value
+// in `membershipRoleEnum`.
+export const platformRoleEnum = pgEnum("platform_role", ["USER", "SUPERUSER"]);
+
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
   email: text("email").notNull().unique(),
@@ -17,6 +24,7 @@ export const users = pgTable("users", {
   emailVerified: timestamp("email_verified_at", { withTimezone: true }),
   name: text("name"),
   image: text("image"),
+  platformRole: platformRoleEnum("platform_role").notNull().default("USER"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

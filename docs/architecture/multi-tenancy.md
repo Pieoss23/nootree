@@ -40,3 +40,7 @@ Questo pattern è già applicato in `src/modules/patients/repository.ts`, `src/m
 ## Protezione dell'ultimo owner
 
 Il DB impone solo l'unicità `(tenantId, userId)` su `memberships`. La regola "non si può rimuovere/retrocedere l'ultimo OWNER attivo di un tenant" è applicativa e **non è ancora implementata** (nessuna mutazione di membership esiste in questa milestone).
+
+## Eccezione sanzionata: amministrazione piattaforma (superuser cross-tenant)
+
+`platformRole` su `users` (`USER` / `SUPERUSER`, colonna separata da `memberships.role`, che resta per-tenant) autorizza un solo modulo, `src/modules/platform/admin-repository.ts`, a interrogare tabelle tenant-owned senza filtro `tenantId` — vedi [ADR 005](./decisions/005-platform-superuser-role.md). `requireSuperuser()` (`src/modules/platform/service.ts`) rilegge `platformRole` dal DB a ogni richiesta (mai un claim di sessione/JWT), stesso pattern di `getActiveTenant()`; l'assegnazione del ruolo è solo manuale (DB/seed) in questa milestone, nessuna UI di promozione. `/admin` (route sorella di `(app)/app`, non annidata) è protetta da `src/proxy.ts` a livello di edge (solo login richiesto) e da `requireSuperuser()` lato server per il controllo di ruolo effettivo.

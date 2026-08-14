@@ -21,7 +21,9 @@ Applicato oggi in `src/modules/patients/repository.ts`, `src/modules/memberships
 
 ## Regola 3 — Nessuna query "globale" su tabelle tenant-owned senza un motivo esplicito
 
-Una query senza filtro `tenantId` su `patients`, `memberships`, ecc. è accettabile solo in contesti espliciti di amministrazione della piattaforma (non esistenti in questa milestone) o negli script di seed/migrazione, mai in un percorso raggiungibile da una richiesta utente.
+Una query senza filtro `tenantId` su `patients`, `memberships`, ecc. è accettabile solo in contesti espliciti di amministrazione della piattaforma o negli script di seed/migrazione, mai in un percorso raggiungibile da una richiesta utente normale.
+
+**Dal 2026-08-14** questo contesto esiste: `src/modules/platform/admin-repository.ts` è l'unico punto sanzionato dove l'isolamento per tenant viene bypassato di proposito, dietro `requireSuperuser()` (verifica server-side, mai un claim di sessione) e con audit obbligatorio su ogni query. Vedi [ADR 005](../architecture/decisions/005-platform-superuser-role.md). Qualsiasi nuova query cross-tenant va aggiunta lì, non ad hoc altrove.
 
 ## Regola 4 — Verifica sempre con un test di integrazione quando possibile
 

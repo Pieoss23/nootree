@@ -16,4 +16,13 @@ describe("isAppRouteAuthorized", () => {
     expect(isAppRouteAuthorized("/app", true)).toBe(true);
     expect(isAppRouteAuthorized("/app/patients", true)).toBe(true);
   });
+
+  it("blocks unauthenticated access to /admin routes", () => {
+    expect(isAppRouteAuthorized("/admin", false)).toBe(false);
+    expect(isAppRouteAuthorized("/admin/tenants", false)).toBe(false);
+  });
+
+  it("allows authenticated access to /admin routes (role checked server-side, not here)", () => {
+    expect(isAppRouteAuthorized("/admin", true)).toBe(true);
+  });
 });
