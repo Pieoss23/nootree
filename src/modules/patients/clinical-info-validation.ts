@@ -32,6 +32,7 @@ export const clinicalInfoFormSchema = z.object({
     "OTHER",
   ] as const),
   activityLevel: optionalEnum(["SEDENTARY", "LIGHT", "MODERATE", "INTENSE"] as const),
+  dietIntensity: optionalEnum(["LIGHT", "MEDIUM", "HARD"] as const),
 });
 
 export type ClinicalInfoFormValues = z.infer<typeof clinicalInfoFormSchema>;

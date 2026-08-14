@@ -6,7 +6,11 @@ import { Button } from "@/components/ui/button";
 // Imported from their concrete files, not the `@/modules/patients` barrel:
 // that barrel also re-exports `repository.ts` (`"server-only"`), which would
 // break bundling for this Client Component. See docs/audit/decisions.md.
-import { getActivityLevelLabel, getNutritionGoalLabel } from "@/modules/patients/labels";
+import {
+  getActivityLevelLabel,
+  getDietIntensityLabel,
+  getNutritionGoalLabel,
+} from "@/modules/patients/labels";
 import type { Patient } from "@/modules/patients/types";
 import { ClinicalInfoFormDialog } from "./clinical-info-form-dialog";
 
@@ -44,6 +48,10 @@ export function ClinicalInfoSection({ patient }: { patient: Patient }) {
         <Field
           label="Attività fisica"
           value={patient.activityLevel ? getActivityLevelLabel(patient.activityLevel) : null}
+        />
+        <Field
+          label="Intensità dieta"
+          value={patient.dietIntensity ? getDietIntensityLabel(patient.dietIntensity) : null}
         />
         <Field
           label="Consenso dati sanitari"

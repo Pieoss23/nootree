@@ -11,6 +11,11 @@ import {
   type ClinicalInfoFormValues,
   type MeasurementFormValues,
 } from "@/modules/patients";
+import {
+  createPatientRecipe,
+  deletePatientRecipe,
+  patientRecipeFormSchema,
+} from "@/modules/recipes";
 import { assertRole, InsufficientRoleError } from "@/modules/memberships";
 import { recordAuditEvent } from "@/modules/audit";
 
@@ -67,6 +72,7 @@ export async function updatePatientClinicalInfoAction(
     medications: formData.get("medications"),
     nutritionGoal: formData.get("nutritionGoal"),
     activityLevel: formData.get("activityLevel"),
+    dietIntensity: formData.get("dietIntensity"),
   });
   if (!parsed.success) {
     return {
@@ -170,6 +176,90 @@ export async function createMeasurementAction(
 
   revalidatePath(`/app/patients/${patientId}`);
   return { status: "success", message: "Misurazione registrata." };
+}
+
+export type AssignRecipeFormState = {
+  status: "idle" | "success" | "error";
+  message?: string;
+};
+
+export async function assignRecipeToPatientAction(
+  _prevState: AssignRecipeFormState,
+  formData: FormData,
+): Promise<AssignRecipeFormState> {
+  const patientId = formData.get("patientId");
+  if (typeof patientId !== "string" || !patientId) {
+    return { status: "error", message: "Paziente non valido." };
+  }
+
+  const tenant = await getActiveTenant();
+  if (!tenant) return { status: "error", message: "Nessuno studio associato al tuo account." };
+
+  try {
+    assertRole(tenant.role, MINIMUM_ROLE_FOR_PATIENT_WRITES);
+  } catch (error) {
+    if (error instanceof InsufficientRoleError) {
+      return { status: "error", message: "Il tuo ruolo non consente di assegnare ricette." };
+    }
+    throw error;
+  }
+
+  const parsed = patientRecipeFormSchema.safeParse({
+    recipeId: formData.get("recipeId"),
+    portionGrams: formData.get("portionGrams"),
+    suggestedPortionGrams: formData.get("suggestedPortionGrams"),
+    notes: formData.get("notes"),
+  });
+  if (!parsed.success) {
+    return { status: "error", message: "Seleziona una ricetta e una porzione valida." };
+  }
+
+  const patientRecipe = await createPatientRecipe({
+    tenantId: tenant.tenantId,
+    patientId,
+    ...parsed.data,
+  });
+
+  await recordAuditEvent({
+    tenantId: tenant.tenantId,
+    actorUserId: tenant.userId,
+    action: "patient.recipe_assigned",
+    entityType: "patient_recipe",
+    entityId: patientRecipe.id,
+  });
+
+  revalidatePath(`/app/patients/${patientId}`);
+  return { status: "success", message: "Ricetta assegnata." };
+}
+
+export async function removePatientRecipeAction(formData: FormData): Promise<void> {
+  const patientId = formData.get("patientId");
+  const patientRecipeId = formData.get("patientRecipeId");
+  if (typeof patientId !== "string" || typeof patientRecipeId !== "string") {
+    throw new Error("Invalid removePatientRecipeAction input.");
+  }
+
+  const tenant = await getActiveTenant();
+  if (!tenant) return;
+
+  assertRole(tenant.role, MINIMUM_ROLE_FOR_PATIENT_WRITES);
+
+  const removed = await deletePatientRecipe({
+    tenantId: tenant.tenantId,
+    patientId,
+    patientRecipeId,
+  });
+  if (!removed) return;
+
+  await recordAuditEvent({
+    tenantId: tenant.tenantId,
+    actorUserId: tenant.userId,
+    action: "patient.recipe_unassigned",
+    entityType: "patient_recipe",
+    entityId: patientRecipeId,
+  });
+
+  revalidatePath(`/app/patients/${patientId}`);
 }
 
 export async function deleteMeasurementAction(formData: FormData): Promise<void> {

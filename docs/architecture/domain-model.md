@@ -32,7 +32,18 @@ Schema definito in `src/db/schema/*`, migrazioni generate in `src/db/migrations/
 
 ## Patients (`patients.ts`)
 
-- **patients** — anagrafica minima (`firstName, lastName, email?, phone?, birthDate?, fiscalCode?, status, internalNotes?`). Nessun dato clinico. `email` **non è univoca**, nemmeno per tenant: non è un identificativo affidabile. Indici su `tenantId` e `(tenantId, email)` per le query più comuni.
+- **patients** — anagrafica minima (`firstName, lastName, email?, phone?, birthDate?, sex?, fiscalCode?, status, internalNotes?`). Nessun dato clinico. `email` **non è univoca**, nemmeno per tenant: non è un identificativo affidabile. Indici su `tenantId` e `(tenantId, email)` per le query più comuni. `sex` (enum `patient_sex`, nullable) è usato solo per stimare il fabbisogno calorico (formula Mifflin-St Jeor) quando manca un BMR misurato — vedi `recipes.ts`/`docs/audit/decisions.md`. Campi clinici/anamnesi (allergie, patologie, farmaci, obiettivo, attività, **intensità dieta** — enum `diet_intensity`, nullable) restano tutti opzionali, entrati nel tempo.
+
+## Prodotti (`products.ts`)
+
+- **foodItems** — catalogo alimenti **condiviso tra tutti i tenant**: unica tabella "business" dello schema senza colonna `tenantId`, perché è dato di riferimento nutrizionale, non proprietà di uno studio. `name` univoco, `category` (enum `food_category`), valori nutrizionali sempre per 100g (`kcalPer100g`, `proteinGPer100g`, `carbsGPer100g`, `fatGPer100g`, `fiberGPer100g?`). `source` traccia la provenienza (oggi solo `CURATED_SEED`: un seed curato a mano, non un import ufficiale CREA/BDA — vedi `docs/audit/decisions.md`).
+- **tenantProducts** — prodotti/ricette creati dallo studio stesso, stessa forma nutrizionale di `foodItems` ma sempre scoped a `tenantId`. `status` (`ACTIVE|ARCHIVED`), archiviati non cancellati fisicamente — stesso pattern di `patients`.
+
+## Ricette (`recipes.ts`)
+
+- **recipes** — ricette dello studio (`name, instructions?, status, tenantId`), tenant-scoped a differenza di `foodItems`. Archiviate non cancellate fisicamente.
+- **recipeIngredients** — una riga per ingrediente, `quantityGrams` sempre in grammi. L'ingrediente è o `foodItemId` (catalogo condiviso) o `tenantProductId` (prodotto del tenant), **mai entrambi né nessuno dei due** — vincolo imposto con un `CHECK` a livello DB (`recipe_ingredients_single_source`), non solo applicativo, perché Postgres non ha un vero FK polimorfico. `tenantId` denormalizzato come FK diretta (Regola 2 di `docs/security/tenant-isolation-rules.md`).
+- **patientRecipes** — assegnazione di una ricetta a un paziente: `portionGrams` (valore effettivo, sempre presente) e `suggestedPortionGrams?` (snapshot del calcolo di `src/modules/recipes/dosage.ts` al momento dell'assegnazione, mai vincolante). Aggiunta/eliminazione, non modifica — stesso ragionamento di `patient_measurements`.
 
 ## Audit (`audit.ts`)
 

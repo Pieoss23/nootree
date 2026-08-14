@@ -160,3 +160,80 @@ Elenco delle decisioni architetturali e operative prese durante la Milestone 1, 
 **Alternative scartate**: `ASSISTANT`+ solo su create/update e `NUTRITIONIST`+ su archive/reactivate — proposta come opzione ma non scelta; `NUTRITIONIST`+ per tutto (accesso di sola lettura per `ASSISTANT`) — proposta ma non scelta.
 
 **Fuori scope, registrato come rischio**: un ruolo "superuser" cross-tenant per amministrare tutti gli studi da un unico account, richiesto dall'utente durante questa conversazione. Non è modellabile come `membership.role` (quelli sono per-tenant); richiede un flag/enum a livello piattaforma su `users`, separato, con proprio ADR — vedi `docs/audit/open-risks.md`.
+
+---
+
+## 2026-08-10 — Catalogo prodotti: nessuna API di terze parti a pagamento, scope minimo + prodotti custom per tenant
+
+**Decisione**: il catalogo alimenti (`foodItems`) è una tabella seedata a mano con dati nutrizionali comuni/rappresentativi (~60 alimenti), non un import bulk della tabella ufficiale CREA/BDA né un'integrazione a pagamento (Edamam/FatSecret/Nutritionix). Scope scelto esplicitamente dall'utente tra 4 alternative proposte: catalogo minimo + prodotti personalizzati per tenant (`tenantProducts`), **senza** lookup live su Open Food Facts.
+
+**Motivazione**: CREA/BDA (la tabella di riferimento per i nutrizionisti italiani) non ha un import bulk scaricabile — qualunque scelta in questa milestone doveva comunque partire da un seed curato, non dalla tabella ufficiale verbatim. Le API commerciali sono tarate su prodotti confezionati/branded USA, non sul dato di composizione professionale che serve a un nutrizionista, e comportano un costo ricorrente non giustificato prima che ci sia un cliente pagante che lo richieda esplicitamente. Vedi anche la ricerca del 2026-08-09 registrata in memoria di progetto (CREA/BDA senza API, Open Food Facts gratuita ma orientata al branded, USDA US-centrica, Edamam/FatSecret commerciali).
+
+**Alternative scartate**: lookup live su Open Food Facts (gratuito, ma introduce gestione di rete/errori verso un servizio esterno non ancora necessaria); un'API commerciale a pagamento (costo ricorrente ingiustificato senza domanda validata); import bulk CREA reale (nessun dataset strutturato scaricabile disponibile in questa sessione).
+
+**Da rivedere se**: emerge una richiesta validata da clienti paganti per capacità che il catalogo locale non copre (es. scanner barcode, copertura branded massiccia) — a quel punto una API a pagamento diventa una decisione di scala, non di bootstrap.
+
+---
+
+## 2026-08-10 — `foodItems` senza `tenantId`: unica tabella "business" a schema condiviso reale
+
+**Decisione**: `food_items` non ha colonna `tenantId` — a differenza di ogni altra tabella tenant-owned dello schema (`patients`, `tenant_products`, ...), è dato di riferimento condiviso tra tutti gli studi, letto ma mai scritto da un singolo tenant.
+
+**Motivazione**: un valore nutrizionale (es. "100g di pasta = 358 kcal") non varia per studio — duplicarlo per tenant avrebbe significato N copie identiche dello stesso dato, senza alcun beneficio di isolamento (non è un dato sensibile né specifico di un cliente). `tenant_products` resta invece scoped a `tenantId`, perché lì il contenuto (una ricetta interna dello studio) è realmente specifico del singolo tenant. Nessun rischio di isolamento multi-tenant qui: non essendoci scritture da parte dei tenant su questa tabella, non si applica `docs/security/tenant-isolation-rules.md` (che riguarda l'isolamento delle scritture/letture per-tenant).
+
+---
+
+## 2026-08-10 — `products.catalog` come feature/limite in tutti i piani, stessa soglia di ruolo dei pazienti
+
+**Decisione**: `FEATURE_KEYS.PRODUCTS_CATALOG` (`"products.catalog"`) è incluso in tutti e tre i piani (`STARTER`/`PROFESSIONAL`/`STUDIO`), con un nuovo limite `customProducts` (50/300/illimitato). Le scritture su `tenantProducts` richiedono `assertRole(tenant.role, "ASSISTANT")`, identico a `patients`.
+
+**Motivazione**: coerenza con la decisione già presa per i pazienti (nessuna differenziazione di ruolo ancora richiesta per questo dominio) e con il pattern `assertFeature`/`assertWithinLimit` già stabilito in `entitlements`. Il catalogo condiviso (`foodItems`) non ha invece alcun controllo di piano/limite, essendo sola lettura e non un consumo di risorsa per tenant.
+
+---
+
+## 2026-08-10 — Ricette + dosaggio consigliato per paziente: formula standard con priorità al BMR misurato, intensità dieta a tre livelli
+
+**Decisione**: richiesta dall'utente una sezione ricette (composte da ingredienti del catalogo/prodotti tenant) con un dosaggio consigliato per paziente basato su dieta e caratteristiche fisiche. Alla domanda su come calcolarlo, sono state proposte 3 opzioni (solo se BMR misurato / stima sempre disponibile con formula standard / solo assistivo senza calcolo automatico); l'utente ha scelto un ibrido: **preferire sempre il BMR misurato da bilancia BIA quando presente, altrimenti stimarlo con la formula Mifflin-St Jeor** (richiede il nuovo campo `sex` su `patients`, non esistente prima), più **tre livelli di intensità dieta (LIGHT/MEDIUM/HARD)** che modulano il deficit/surplus calorico applicato quando l'obiettivo è dimagrimento/aumento massa.
+
+**Implementazione** (`src/modules/recipes/dosage.ts`, puro, nessun accesso a DB):
+
+1. BMR: usa `patient_measurements.basalMetabolicRateKcal` dell'ultima misurazione se presente; altrimenti stima con Mifflin-St Jeor (richiede `sex`, età da `birthDate`, peso/altezza dall'ultima misurazione) — se anche questi mancano, ritorna `insufficient_data` con l'elenco esatto di cosa manca, mai un valore indovinato.
+2. TDEE = BMR × fattore di attività standard (`SEDENTARY 1.2 / LIGHT 1.375 / MODERATE 1.55 / INTENSE 1.725`) — richiede `activityLevel` impostato, altrimenti `insufficient_data`.
+3. Target giornaliero = TDEE, salvo `nutritionGoal` `WEIGHT_LOSS`/`WEIGHT_GAIN`: in quel caso si applica un delta fisso in kcal in base a `dietIntensity` (`LIGHT 250 / MEDIUM 500 / HARD 750`, valori indicativi comuni in pratica nutrizionistica, non un parametro clinico validato — regolabili). Nessun obiettivo impostato = trattato come mantenimento; obiettivo di perdita/aumento senza intensità impostata = default `MEDIUM`.
+4. Porzione consigliata per una ricetta = quota fissa del target giornaliero (`DEFAULT_MEAL_KCAL_FRACTION = 0.3`, assunzione "un pasto principale" — non esiste un concetto di slot pasto nel dominio) divisa per la densità calorica della ricetta.
+
+**Motivazione**: l'utente ha esplicitamente richiesto la stima automatica anche in assenza di BMR misurato ("formula standard e in caso BMR, a scelta in base al paziente"), scartando l'opzione più conservativa (solo assistivo). Preferire sempre il BMR misurato quando disponibile perché più affidabile di qualunque formula. Restituire `insufficient_data` invece di un default silenzioso quando mancano dati clinici (sesso, età, peso, altezza, attività) evita di mostrare un numero clinicamente fuorviante spacciato per un calcolo reale.
+
+**Non vincolante per design**: `suggestedPortionGrams` è solo uno snapshot mostrato/precompilato nel form di assegnazione (`assign-recipe-dialog.tsx`) — il valore effettivamente salvato (`portionGrams`) è sempre quello confermato dal nutrizionista, mai imposto automaticamente. Scelta guidata da prudenza clinica/di responsabilità, coerente con l'opzione "assistivo" anche se non quella scelta come unica modalità.
+
+**Alternative scartate**: le altre due opzioni proposte (solo BMR misurato senza stima; nessun calcolo automatico) — l'utente ha scelto esplicitamente l'ibrido. Un concetto di "slot pasto" (colazione/pranzo/cena) con percentuali diverse per slot — non richiesto, avrebbe aggiunto un campo/decisione di prodotto in più senza indicazione dell'utente; il fattore fisso al 30% resta un'assunzione singola, documentata e facilmente parametrizzabile in futuro.
+
+---
+
+## 2026-08-10 — Vincolo "esattamente una fonte" su `recipe_ingredients` imposto a livello DB, non solo applicativo
+
+**Decisione**: `recipe_ingredients` ha due colonne FK nullable (`foodItemId`, `tenantProductId`) invece di un vero riferimento polimorfico (che Postgres non supporta nativamente); un `CHECK` a livello database (`recipe_ingredients_single_source`) impone che sia valorizzata esattamente una delle due, mai entrambe né nessuna.
+
+**Motivazione**: coerente con lo stile del resto dello schema (enum invece di stringhe libere, unique constraint invece di verifiche solo applicative — vedi patients.ts) di far imporre gli invarianti strutturali al database quando possibile, non solo alla validazione Zod lato server action. Verificato con un test di integrazione dedicato (inserimento con entrambe le colonne valorizzate o nessuna delle due, in entrambi i casi la query fallisce).
+
+**Alternative scartate**: una tabella `ingredient_sources` di lookup con `sourceType`/`sourceId` senza FK reali (perderebbe l'integrità referenziale su entrambe le fonti); nessun vincolo DB, solo Zod (avrebbe permesso righe incoerenti da un accesso diretto al DB, es. script di migrazione futuri).
+
+---
+
+## 2026-08-10 — Attivata la feature placeholder `future.nutritionPlans` → `nutrition.plans`
+
+**Decisione**: `FEATURE_KEYS.FUTURE_NUTRITION_PLANS` (`"future.nutritionPlans"`, mai incluso in alcun piano, descritto come "in arrivo") è stato rinominato `NUTRITION_PLANS` (`"nutrition.plans"`) e reso una feature reale inclusa in tutti e tre i piani, usata da `assignRecipeToPatientAction`. Aggiunta separatamente `recipes.management` per la gestione del catalogo ricette dello studio (CRUD ricette/ingredienti).
+
+**Motivazione**: il placeholder esistente in `src/config/plans.ts` descriveva esattamente questa funzionalità ("Creazione piani alimentari — non ancora disponibile"); riutilizzarlo invece di introdurre una chiave ridondante mantiene `config/plans.ts` come fonte unica di verità coerente con l'intento originale. Rinominare la stringa chiave (non solo la costante TypeScript) è stato sicuro perché non esistono dati di produzione — solo il seed di sviluppo, rigenerato ad ogni `pnpm db:seed`.
+
+---
+
+## 2026-08-10 — Warning "uncontrolled Select/Checkbox" di Base UI: remount via `key={patient.updatedAt}`, non componenti controllati
+
+**Decisione**: segnalato dall'utente in console del browser ("A component is changing the default value/checked state of an uncontrolled Select/Checkbox after being initialized"), su `patient-form-dialog.tsx` (Select sesso) e `clinical-info-form-dialog.tsx` (Select obiettivo/attività/intensità dieta, Checkbox consenso GDPR). Corretto aggiungendo `key={patient.updatedAt.toISOString()}` (o `?? "create"`/`"new"` quando `patient` è assente) al `<form>` di entrambi i dialog, invece di convertire i campi in componenti controllati come suggerito dal messaggio di Base UI.
+
+**Causa**: questi dialog restano montati in permanenza (nascosti, non smontati, quando chiusi — vivono dentro `PatientRowActions`/`ClinicalInfoSection` che ricevono sempre il `patient` più recente dal Server Component). Dopo un salvataggio riuscito, `revalidatePath` fa rifluire un `patient` aggiornato (es. `healthDataConsentAt` ora valorizzato, o un nuovo `nutritionGoal`) nella stessa istanza già montata — Base UI intercetta questo come "il `defaultValue`/`defaultChecked` è cambiato su un componente già inizializzato" e avvisa in console, perché un valore di default per definizione dovrebbe contare solo al primo mount.
+
+**Motivazione della scelta (remount vs controllato)**: la milestone precedente aveva già deciso esplicitamente per form non controllati con Zod lato server come unica fonte di verità (vedi voce "Validazione con `noValidate`..." sopra); convertire Select/Checkbox in componenti controllati avrebbe introdotto stato locale React proprio dove il progetto lo evita deliberatamente. `updatedAt` cambia esattamente quando (e solo quando) la riga paziente viene realmente aggiornata, quindi è un fingerprint naturale e già esistente per forzare un remount con `defaultValue`/`defaultChecked` corretti, senza introdurre alcun nuovo stato.
+
+**Verifica**: nessun warning "Base UI" nel log del browser durante `tests-e2e/patient-detail.spec.ts` (che modifica sia il checkbox di consenso sia il campo attività fisica e salva), prima presente. `pnpm check` (115/115 test) verde.

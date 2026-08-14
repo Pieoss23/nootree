@@ -12,6 +12,8 @@ import {
   subscriptionItems,
 } from "./billing";
 import { patients, patientMeasurements } from "./patients";
+import { foodItems, tenantProducts } from "./products";
+import { recipes, recipeIngredients, patientRecipes } from "./recipes";
 
 export const usersRelations = relations(users, ({ many }) => ({
   accounts: many(accounts),
@@ -35,6 +37,9 @@ export const tenantsRelations = relations(tenants, ({ one, many }) => ({
   memberships: many(memberships),
   invitations: many(invitations),
   patients: many(patients),
+  products: many(tenantProducts),
+  recipes: many(recipes),
+  patientRecipes: many(patientRecipes),
   entitlements: many(tenantEntitlements),
   billingCustomer: one(billingCustomers, {
     fields: [tenants.id],
@@ -100,9 +105,36 @@ export const subscriptionItemsRelations = relations(subscriptionItems, ({ one })
 export const patientsRelations = relations(patients, ({ one, many }) => ({
   tenant: one(tenants, { fields: [patients.tenantId], references: [tenants.id] }),
   measurements: many(patientMeasurements),
+  recipes: many(patientRecipes),
 }));
 
 export const patientMeasurementsRelations = relations(patientMeasurements, ({ one }) => ({
   tenant: one(tenants, { fields: [patientMeasurements.tenantId], references: [tenants.id] }),
   patient: one(patients, { fields: [patientMeasurements.patientId], references: [patients.id] }),
+}));
+
+export const tenantProductsRelations = relations(tenantProducts, ({ one }) => ({
+  tenant: one(tenants, { fields: [tenantProducts.tenantId], references: [tenants.id] }),
+}));
+
+export const recipesRelations = relations(recipes, ({ one, many }) => ({
+  tenant: one(tenants, { fields: [recipes.tenantId], references: [tenants.id] }),
+  ingredients: many(recipeIngredients),
+  patientRecipes: many(patientRecipes),
+}));
+
+export const recipeIngredientsRelations = relations(recipeIngredients, ({ one }) => ({
+  tenant: one(tenants, { fields: [recipeIngredients.tenantId], references: [tenants.id] }),
+  recipe: one(recipes, { fields: [recipeIngredients.recipeId], references: [recipes.id] }),
+  foodItem: one(foodItems, { fields: [recipeIngredients.foodItemId], references: [foodItems.id] }),
+  tenantProduct: one(tenantProducts, {
+    fields: [recipeIngredients.tenantProductId],
+    references: [tenantProducts.id],
+  }),
+}));
+
+export const patientRecipesRelations = relations(patientRecipes, ({ one }) => ({
+  tenant: one(tenants, { fields: [patientRecipes.tenantId], references: [tenants.id] }),
+  patient: one(patients, { fields: [patientRecipes.patientId], references: [patients.id] }),
+  recipe: one(recipes, { fields: [patientRecipes.recipeId], references: [recipes.id] }),
 }));

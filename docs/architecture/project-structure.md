@@ -8,9 +8,19 @@ src/
 │   ├── (app)/app/              # Shell gestionale, protetta da src/proxy.ts
 │   │   └── patients/             # actions.ts, patient-form-dialog.tsx, patients-page-client.tsx,
 │   │       │                      # patients-table.tsx — UI + server action del CRUD pazienti
-│   │       └── [id]/               # Pagina di dettaglio paziente (prima dynamic route dell'app):
+│   │       └── [id]/               # Pagina di dettaglio paziente (prima dynamic route dell'app), a Tabs:
 │   │                                # anamnesi clinica (clinical-info-*) + storico misurazioni/BIA
-│   │                                # (measurement-*, measurements-*), actions.ts a parte
+│   │                                # (measurement-*, measurements-*) in un tab, ricette assegnate
+│   │                                # (patient-recipes-*, assign-recipe-dialog.tsx) in un altro,
+│   │                                # actions.ts a parte
+│   │   └── products/             # actions.ts, product-form-dialog.tsx, products-page-client.tsx,
+│   │                               # products-table.tsx (prodotti dello studio) + food-catalog-table.tsx
+│   │                               # (catalogo condiviso, sola lettura)
+│   │   └── recipes/               # actions.ts, recipe-form-dialog.tsx, recipes-page-client.tsx,
+│   │       │                        # recipes-table.tsx — pannello ricette dello studio
+│   │       └── [id]/                 # Dettaglio ricetta: ingredients-section/-table (aggiunta/rimozione
+│   │                                  # ingredienti da catalogo o prodotti tenant), nutrition-summary.tsx
+│   │                                  # (totali calcolati, non salvati), actions.ts a parte
 │   ├── api/health/             # Health check
 │   ├── api/auth/[...nextauth]/ # Handler Auth.js (GET/POST re-esportati da src/lib/auth.ts)
 │   ├── error.tsx, global-error.tsx, not-found.tsx
@@ -24,6 +34,10 @@ src/
 │   ├── entitlements/                # hasFeature/assertFeature/getResourceLimit/assertWithinLimit (implementato)
 │   ├── patients/                     # Repository CRUD + anamnesi clinica + misurazioni/BIA (tipi/scritture;
 │   │                                   # l'UI vive in src/app/(app)/app/patients/)
+│   ├── products/                      # Catalogo alimenti condiviso (sola lettura) + CRUD prodotti
+│   │                                    # personalizzati per tenant (implementato)
+│   ├── recipes/                        # CRUD ricette + ingredienti, calcolo nutrizionale (nutrition.ts,
+│   │                                     # puro) e stima fabbisogno/dosaggio (dosage.ts, puro) (implementato)
 │   ├── audit/                        # recordAuditEvent, append-only (implementato)
 │   └── notifications/                # EmailProvider + ConsoleEmailProvider (dev-only)
 ├── components/

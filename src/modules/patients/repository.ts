@@ -2,7 +2,14 @@ import "server-only";
 import { and, count, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { patients } from "@/db/schema";
-import type { ActivityLevel, NutritionGoal, Patient, PatientStatus } from "./types";
+import type {
+  ActivityLevel,
+  DietIntensity,
+  NutritionGoal,
+  Patient,
+  PatientSex,
+  PatientStatus,
+} from "./types";
 
 /**
  * Every query here takes `tenantId` explicitly and filters by it — never
@@ -50,6 +57,7 @@ export type PatientWriteFields = {
   email: string | null;
   phone: string | null;
   birthDate: string | null;
+  sex: PatientSex | null;
   fiscalCode: string | null;
   internalNotes: string | null;
 };
@@ -66,6 +74,7 @@ export async function createPatient(
       email: input.email,
       phone: input.phone,
       birthDate: input.birthDate,
+      sex: input.sex,
       fiscalCode: input.fiscalCode,
       internalNotes: input.internalNotes,
     })
@@ -85,6 +94,7 @@ export async function updatePatient(
       email: input.email,
       phone: input.phone,
       birthDate: input.birthDate,
+      sex: input.sex,
       fiscalCode: input.fiscalCode,
       internalNotes: input.internalNotes,
       updatedAt: new Date(),
@@ -101,6 +111,7 @@ export type ClinicalWriteFields = {
   medications: string | null;
   nutritionGoal: NutritionGoal | null;
   activityLevel: ActivityLevel | null;
+  dietIntensity: DietIntensity | null;
   healthDataConsentAt: Date | null;
 };
 
@@ -117,6 +128,7 @@ export async function updatePatientClinicalInfo(
       medications: input.medications,
       nutritionGoal: input.nutritionGoal,
       activityLevel: input.activityLevel,
+      dietIntensity: input.dietIntensity,
       healthDataConsentAt: input.healthDataConsentAt,
       updatedAt: new Date(),
     })

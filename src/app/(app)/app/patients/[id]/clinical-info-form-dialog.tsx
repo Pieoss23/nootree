@@ -25,7 +25,11 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 // Imported from their concrete files, not the `@/modules/patients` barrel:
 // that barrel also re-exports `repository.ts` (`"server-only"`), which would
 // break bundling for this Client Component. See docs/audit/decisions.md.
-import { NUTRITION_GOAL_OPTIONS, ACTIVITY_LEVEL_OPTIONS } from "@/modules/patients/labels";
+import {
+  NUTRITION_GOAL_OPTIONS,
+  ACTIVITY_LEVEL_OPTIONS,
+  DIET_INTENSITY_OPTIONS,
+} from "@/modules/patients/labels";
 import type { Patient } from "@/modules/patients/types";
 import { updatePatientClinicalInfoAction, type ClinicalInfoFormState } from "./actions";
 
@@ -62,7 +66,18 @@ export function ClinicalInfoFormDialog({
             Dati clinici del paziente, visibili solo allo studio.
           </DialogDescription>
         </DialogHeader>
-        <form action={formAction} noValidate className="space-y-3">
+        {/* Keyed by `updatedAt` so a successful save (which changes the
+        underlying patient row) remounts the Select/Checkbox fields instead of
+        mutating their `defaultValue`/`defaultChecked` on an already-mounted
+        instance — the latter is what triggers Base UI's uncontrolled-input
+        dev warning, since this dialog stays mounted (just hidden) between
+        opens. See docs/audit/decisions.md. */}
+        <form
+          key={patient.updatedAt.toISOString()}
+          action={formAction}
+          noValidate
+          className="space-y-3"
+        >
           <input type="hidden" name="patientId" value={patient.id} />
           <input
             type="hidden"
@@ -133,6 +148,27 @@ export function ClinicalInfoFormDialog({
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="dietIntensity">Intensità dieta</Label>
+            <Select name="dietIntensity" defaultValue={patient.dietIntensity ?? "NONE"}>
+              <SelectTrigger id="dietIntensity" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="NONE">Nessuna</SelectItem>
+                {DIET_INTENSITY_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Influisce sul dosaggio consigliato delle ricette assegnate (solo per obiettivi di
+              dimagrimento/aumento massa).
+            </p>
           </div>
 
           <div className="flex items-center gap-2">

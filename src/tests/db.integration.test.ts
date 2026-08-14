@@ -17,6 +17,21 @@ import {
   createMeasurement,
 } from "@/modules/patients";
 import { tenantResolver, membershipChecker } from "@/modules/tenancy";
+import {
+  listFoodItems,
+  listTenantProducts,
+  createTenantProduct,
+  updateTenantProduct,
+} from "@/modules/products";
+import {
+  listRecipesByTenant,
+  createRecipe,
+  addRecipeIngredient,
+  listRecipeIngredients,
+  listActiveRecipeSummariesByTenant,
+  createPatientRecipe,
+  listPatientRecipes,
+} from "@/modules/recipes";
 
 /**
  * Exercises the database against TEST_DATABASE_URL only — never the
@@ -95,7 +110,14 @@ describe.skipIf(!testDatabaseUrl)("database integration", () => {
 
     const featureKeys = rows.map((row) => row.featureKey).sort();
     expect(featureKeys).toEqual(
-      ["billing.portal", "patients.management", "team.management"].sort(),
+      [
+        "billing.portal",
+        "nutrition.plans",
+        "patients.management",
+        "products.catalog",
+        "recipes.management",
+        "team.management",
+      ].sort(),
     );
   });
 
@@ -236,6 +258,7 @@ describe.skipIf(!testDatabaseUrl)("database integration", () => {
       email: null,
       phone: null,
       birthDate: null,
+      sex: null,
       fiscalCode: null,
       internalNotes: null,
     });
@@ -264,6 +287,7 @@ describe.skipIf(!testDatabaseUrl)("database integration", () => {
       email: null,
       phone: null,
       birthDate: null,
+      sex: null,
       fiscalCode: null,
       internalNotes: null,
     });
@@ -276,6 +300,7 @@ describe.skipIf(!testDatabaseUrl)("database integration", () => {
       email: null,
       phone: null,
       birthDate: null,
+      sex: null,
       fiscalCode: null,
       internalNotes: null,
     });
@@ -292,6 +317,7 @@ describe.skipIf(!testDatabaseUrl)("database integration", () => {
       email: null,
       phone: null,
       birthDate: null,
+      sex: null,
       fiscalCode: null,
       internalNotes: null,
     });
@@ -310,6 +336,7 @@ describe.skipIf(!testDatabaseUrl)("database integration", () => {
       email: null,
       phone: null,
       birthDate: null,
+      sex: null,
       fiscalCode: null,
       internalNotes: null,
     });
@@ -450,6 +477,7 @@ describe.skipIf(!testDatabaseUrl)("database integration", () => {
       email: null,
       phone: null,
       birthDate: null,
+      sex: null,
       fiscalCode: null,
       internalNotes: null,
     });
@@ -462,6 +490,7 @@ describe.skipIf(!testDatabaseUrl)("database integration", () => {
       medications: null,
       nutritionGoal: null,
       activityLevel: null,
+      dietIntensity: null,
       healthDataConsentAt: null,
     });
     expect(crossTenantUpdate).toBeNull();
@@ -477,6 +506,7 @@ describe.skipIf(!testDatabaseUrl)("database integration", () => {
       medications: null,
       nutritionGoal: "WEIGHT_LOSS",
       activityLevel: "MODERATE",
+      dietIntensity: null,
       healthDataConsentAt: null,
     });
     expect(sameTenantUpdate?.allergiesIntolerances).toBe("Glutine");
@@ -500,6 +530,7 @@ describe.skipIf(!testDatabaseUrl)("database integration", () => {
       email: null,
       phone: null,
       birthDate: null,
+      sex: null,
       fiscalCode: null,
       internalNotes: null,
     });
@@ -547,6 +578,175 @@ describe.skipIf(!testDatabaseUrl)("database integration", () => {
       patientId: patient.id,
     });
     expect(measurementsForB).toHaveLength(0);
+  });
+
+  it("seeds a shared food catalog not scoped to any tenant", async () => {
+    await seedDevelopmentData(db);
+    const items = await listFoodItems();
+    expect(items.length).toBeGreaterThan(0);
+    expect(items.find((item) => item.name === "Pasta di semola (secca)")).toBeDefined();
+  });
+
+  it("scopes tenant products to the requested tenant and refuses cross-tenant updates", async () => {
+    const [tenantA] = await db
+      .insert(schema.tenants)
+      .values({ name: "Products Tenant A", slug: `products-a-${randomUUID()}` })
+      .returning();
+    const [tenantB] = await db
+      .insert(schema.tenants)
+      .values({ name: "Products Tenant B", slug: `products-b-${randomUUID()}` })
+      .returning();
+
+    const product = await createTenantProduct({
+      tenantId: tenantA.id,
+      name: "Insalata dello chef",
+      kcalPer100g: 120,
+      proteinGPer100g: null,
+      carbsGPer100g: null,
+      fatGPer100g: null,
+      fiberGPer100g: null,
+      notes: null,
+    });
+
+    const listForA = await listTenantProducts({ tenantId: tenantA.id });
+    const listForB = await listTenantProducts({ tenantId: tenantB.id });
+    expect(listForA.map((p) => p.id)).toContain(product.id);
+    expect(listForB.map((p) => p.id)).not.toContain(product.id);
+
+    const crossTenantUpdate = await updateTenantProduct({
+      tenantId: tenantB.id,
+      productId: product.id,
+      name: "Modificato da altro tenant",
+      kcalPer100g: 200,
+      proteinGPer100g: null,
+      carbsGPer100g: null,
+      fatGPer100g: null,
+      fiberGPer100g: null,
+      notes: null,
+    });
+    expect(crossTenantUpdate).toBeNull();
+  });
+
+  it("scopes recipes to the requested tenant and computes ingredient nutrition via the join", async () => {
+    await seedDevelopmentData(db);
+    const [tenantA] = await db
+      .insert(schema.tenants)
+      .values({ name: "Recipes Tenant A", slug: `recipes-a-${randomUUID()}` })
+      .returning();
+    const [tenantB] = await db
+      .insert(schema.tenants)
+      .values({ name: "Recipes Tenant B", slug: `recipes-b-${randomUUID()}` })
+      .returning();
+
+    const [chicken] = await db
+      .select()
+      .from(schema.foodItems)
+      .where(eq(schema.foodItems.name, "Petto di pollo"));
+
+    const recipe = await createRecipe({
+      tenantId: tenantA.id,
+      name: "Pollo semplice",
+      instructions: null,
+    });
+    await addRecipeIngredient({
+      tenantId: tenantA.id,
+      recipeId: recipe.id,
+      foodItemId: chicken.id,
+      tenantProductId: null,
+      quantityGrams: 200,
+    });
+
+    const ingredients = await listRecipeIngredients({ tenantId: tenantA.id, recipeId: recipe.id });
+    expect(ingredients).toHaveLength(1);
+    expect(ingredients[0].source).toBe("FOOD_ITEM");
+    expect(ingredients[0].name).toBe("Petto di pollo");
+    expect(ingredients[0].kcalPer100g).toBe(chicken.kcalPer100g);
+
+    const recipesForA = await listRecipesByTenant({ tenantId: tenantA.id });
+    const recipesForB = await listRecipesByTenant({ tenantId: tenantB.id });
+    expect(recipesForA.map((r) => r.id)).toContain(recipe.id);
+    expect(recipesForB.map((r) => r.id)).not.toContain(recipe.id);
+
+    const summaries = await listActiveRecipeSummariesByTenant({ tenantId: tenantA.id });
+    const summary = summaries.find((s) => s.id === recipe.id);
+    expect(summary?.totalGrams).toBe(200);
+    expect(summary?.kcalPer100g).toBeCloseTo(chicken.kcalPer100g);
+  });
+
+  it("rejects a recipe ingredient with both or neither ingredient source set", async () => {
+    const [tenant] = await db
+      .insert(schema.tenants)
+      .values({ name: "Ingredient Source Tenant", slug: `ingredient-source-${randomUUID()}` })
+      .returning();
+    const recipe = await createRecipe({ tenantId: tenant.id, name: "Test", instructions: null });
+    const [foodItem] = await db.select().from(schema.foodItems).limit(1);
+    const [product] = await db
+      .insert(schema.tenantProducts)
+      .values({ tenantId: tenant.id, name: "Prodotto test", kcalPer100g: 100 })
+      .returning();
+
+    await expect(
+      db.insert(schema.recipeIngredients).values({
+        tenantId: tenant.id,
+        recipeId: recipe.id,
+        foodItemId: null,
+        tenantProductId: null,
+        quantityGrams: 100,
+      }),
+    ).rejects.toThrow();
+
+    await expect(
+      db.insert(schema.recipeIngredients).values({
+        tenantId: tenant.id,
+        recipeId: recipe.id,
+        foodItemId: foodItem.id,
+        tenantProductId: product.id,
+        quantityGrams: 100,
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("scopes patient recipe assignments to the requested tenant", async () => {
+    const [tenantA] = await db
+      .insert(schema.tenants)
+      .values({ name: "Patient Recipes Tenant A", slug: `patient-recipes-a-${randomUUID()}` })
+      .returning();
+    const [tenantB] = await db
+      .insert(schema.tenants)
+      .values({ name: "Patient Recipes Tenant B", slug: `patient-recipes-b-${randomUUID()}` })
+      .returning();
+
+    const patient = await createPatient({
+      tenantId: tenantA.id,
+      firstName: "Con",
+      lastName: "Ricetta",
+      email: null,
+      phone: null,
+      birthDate: null,
+      sex: null,
+      fiscalCode: null,
+      internalNotes: null,
+    });
+    const recipe = await createRecipe({
+      tenantId: tenantA.id,
+      name: "Ricetta assegnata",
+      instructions: null,
+    });
+
+    const assignment = await createPatientRecipe({
+      tenantId: tenantA.id,
+      patientId: patient.id,
+      recipeId: recipe.id,
+      portionGrams: 150,
+      suggestedPortionGrams: 140,
+      notes: null,
+    });
+
+    const forA = await listPatientRecipes({ tenantId: tenantA.id, patientId: patient.id });
+    const forB = await listPatientRecipes({ tenantId: tenantB.id, patientId: patient.id });
+    expect(forA.map((p) => p.id)).toContain(assignment.id);
+    expect(forA[0].recipeName).toBe("Ricetta assegnata");
+    expect(forB).toHaveLength(0);
   });
 
   it("cascades tenant deletion to its memberships (not silently orphaned)", async () => {

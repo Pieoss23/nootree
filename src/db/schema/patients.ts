@@ -30,6 +30,17 @@ export const patientActivityLevelEnum = pgEnum("patient_activity_level", [
   "INTENSE",
 ]);
 
+// Solo per la stima del fabbisogno calorico (formula Mifflin-St Jeor) quando
+// manca un BMR misurato da bilancia BIA — vedi src/modules/recipes/dosage.ts
+// e docs/audit/decisions.md. Nullable: dato biometrico, non anagrafico
+// obbligatorio, e i pazienti esistenti non lo hanno mai avuto richiesto.
+export const patientSexEnum = pgEnum("patient_sex", ["MALE", "FEMALE"]);
+
+// Intensità del deficit/surplus calorico applicato al fabbisogno stimato del
+// paziente quando l'obiettivo è dimagrimento/aumento massa — vedi
+// src/modules/recipes/dosage.ts. Non ha effetto per MAINTENANCE/CLINICAL/OTHER.
+export const dietIntensityEnum = pgEnum("diet_intensity", ["LIGHT", "MEDIUM", "HARD"]);
+
 export const patients = pgTable(
   "patients",
   {
@@ -44,6 +55,7 @@ export const patients = pgTable(
     email: text("email"),
     phone: text("phone"),
     birthDate: date("birth_date"),
+    sex: patientSexEnum("sex"),
     fiscalCode: text("fiscal_code"),
     status: patientStatusEnum("status").notNull().default("ACTIVE"),
     internalNotes: text("internal_notes"),
@@ -55,6 +67,7 @@ export const patients = pgTable(
     medications: text("medications"),
     nutritionGoal: patientNutritionGoalEnum("nutrition_goal"),
     activityLevel: patientActivityLevelEnum("activity_level"),
+    dietIntensity: dietIntensityEnum("diet_intensity"),
     // GDPR art. 9 special-category consent for storing health data. `null` =
     // no consent on record (not "denied" — just not yet asked/given).
     healthDataConsentAt: timestamp("health_data_consent_at", { withTimezone: true }),

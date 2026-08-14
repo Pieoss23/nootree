@@ -50,4 +50,50 @@ test.describe("patient detail", () => {
     await expect(main.getByText("Prima pesata")).toBeVisible();
     await expect(main.getByText("Ultima pesata")).toBeVisible();
   });
+
+  test("assigns a recipe with a suggested dosage from the Ricette tab", async ({ page }) => {
+    const uniqueSuffix = Date.now();
+    const firstName = "E2ERecipe";
+    const lastName = `Patient${uniqueSuffix}`;
+
+    await page.goto("/app/patients");
+    await page.getByRole("button", { name: "Nuovo paziente" }).click();
+    await page.getByLabel("Nome", { exact: true }).fill(firstName);
+    await page.getByLabel("Cognome").fill(lastName);
+    await page.getByLabel("Data di nascita").fill("1990-05-12");
+    await page.getByLabel("Sesso").click();
+    await page.getByRole("option", { name: "Femmina" }).click();
+    await page.getByRole("button", { name: "Crea paziente" }).click();
+
+    await page.getByRole("link", { name: `${firstName} ${lastName}` }).click();
+    const main = page.getByRole("main");
+
+    // Attività fisica, necessaria per il calcolo del fabbisogno giornaliero.
+    await main.getByRole("button", { name: "Modifica", exact: true }).click();
+    await page.getByLabel("Attività fisica").click();
+    await page.getByRole("option", { name: "Moderata" }).click();
+    await page.getByRole("button", { name: "Salva" }).click();
+
+    // Peso/altezza, necessari per la stima Mifflin-St Jeor (nessun BMR misurato).
+    await main.getByRole("button", { name: "Aggiungi misurazione" }).click();
+    const measurementDialog = page.getByRole("dialog");
+    await measurementDialog.getByLabel("Data").fill("2026-02-01");
+    await measurementDialog.getByLabel("Peso (kg)").fill("65");
+    await measurementDialog.getByLabel("Altezza (cm)").fill("165");
+    await measurementDialog.getByRole("button", { name: "Aggiungi misurazione" }).click();
+    await expect(main.getByText("65 kg")).toBeVisible();
+
+    await page.getByRole("tab", { name: "Ricette" }).click();
+    await expect(main.getByText("Fabbisogno giornaliero stimato")).toBeVisible();
+    await expect(main.getByText("BMR stimato")).toBeVisible();
+
+    await main.getByRole("button", { name: "Assegna ricetta" }).click();
+    const assignDialog = page.getByRole("dialog");
+    await assignDialog.getByLabel("Ricetta").click();
+    await page.getByRole("option", { name: "Pollo con riso e zucchine" }).click();
+    await expect(assignDialog.getByText("Porzione suggerita")).toBeVisible();
+    await assignDialog.getByRole("button", { name: "Assegna" }).click();
+
+    await expect(main.getByText("Pollo con riso e zucchine")).toBeVisible();
+  });
 });

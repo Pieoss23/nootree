@@ -7,6 +7,7 @@ const baseInput = {
   medications: "",
   nutritionGoal: "",
   activityLevel: "",
+  dietIntensity: "",
 };
 
 describe("clinicalInfoFormSchema", () => {
@@ -18,6 +19,7 @@ describe("clinicalInfoFormSchema", () => {
       medications: null,
       nutritionGoal: null,
       activityLevel: null,
+      dietIntensity: null,
     });
   });
 
@@ -45,6 +47,17 @@ describe("clinicalInfoFormSchema", () => {
     ).toBe(false);
     expect(
       clinicalInfoFormSchema.safeParse({ ...baseInput, activityLevel: "NOT_A_LEVEL" }).success,
+    ).toBe(false);
+  });
+
+  it("accepts a valid dietIntensity", () => {
+    const result = clinicalInfoFormSchema.parse({ ...baseInput, dietIntensity: "HARD" });
+    expect(result.dietIntensity).toBe("HARD");
+  });
+
+  it("rejects an invalid dietIntensity", () => {
+    expect(
+      clinicalInfoFormSchema.safeParse({ ...baseInput, dietIntensity: "EXTREME" }).success,
     ).toBe(false);
   });
 });

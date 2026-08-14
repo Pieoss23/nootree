@@ -35,6 +35,7 @@ function parseForm(formData: FormData) {
     email: formData.get("email"),
     phone: formData.get("phone"),
     birthDate: formData.get("birthDate"),
+    sex: formData.get("sex"),
     fiscalCode: formData.get("fiscalCode"),
     internalNotes: formData.get("internalNotes"),
   });

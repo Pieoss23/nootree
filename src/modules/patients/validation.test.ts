@@ -7,6 +7,7 @@ const baseInput = {
   email: "",
   phone: "",
   birthDate: "",
+  sex: "",
   fiscalCode: "",
   internalNotes: "",
 };
@@ -20,6 +21,7 @@ describe("patientFormSchema", () => {
       email: null,
       phone: null,
       birthDate: null,
+      sex: null,
       fiscalCode: null,
       internalNotes: null,
     });
@@ -55,5 +57,14 @@ describe("patientFormSchema", () => {
     expect(patientFormSchema.safeParse({ ...baseInput, birthDate: "12/05/1990" }).success).toBe(
       false,
     );
+  });
+
+  it("accepts a valid sex", () => {
+    const result = patientFormSchema.parse({ ...baseInput, sex: "FEMALE" });
+    expect(result.sex).toBe("FEMALE");
+  });
+
+  it("rejects an invalid sex", () => {
+    expect(patientFormSchema.safeParse({ ...baseInput, sex: "OTHER" }).success).toBe(false);
   });
 });

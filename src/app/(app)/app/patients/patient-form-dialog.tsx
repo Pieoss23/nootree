@@ -14,9 +14,17 @@ import {
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import type { Patient } from "@/modules/patients";
+import type { Patient } from "@/modules/patients/types";
+import { SEX_OPTIONS } from "@/modules/patients/labels";
 import { createPatientAction, updatePatientAction, type PatientFormState } from "./actions";
 
 const idleState: PatientFormState = { status: "idle" };
@@ -64,7 +72,18 @@ export function PatientFormDialog({
               : "Aggiorna i dati anagrafici del paziente."}
           </DialogDescription>
         </DialogHeader>
-        <form ref={formRef} action={formAction} noValidate className="space-y-3">
+        {/* Keyed by `updatedAt` so a successful save remounts the Select
+        (sesso) instead of mutating its `defaultValue` on an already-mounted
+        instance — that's what triggers Base UI's uncontrolled-input dev
+        warning, since this dialog stays mounted (just hidden) between opens.
+        See docs/audit/decisions.md. */}
+        <form
+          ref={formRef}
+          key={patient?.updatedAt.toISOString() ?? "create"}
+          action={formAction}
+          noValidate
+          className="space-y-3"
+        >
           {mode === "edit" && patient ? (
             <input type="hidden" name="patientId" value={patient.id} />
           ) : null}
@@ -130,6 +149,27 @@ export function PatientFormDialog({
                 <p className="text-xs text-destructive">{state.fieldErrors.birthDate}</p>
               ) : null}
             </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="sex">Sesso</Label>
+            <Select name="sex" defaultValue={patient?.sex ?? "NONE"}>
+              <SelectTrigger id="sex" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="NONE">Non specificato</SelectItem>
+                {SEX_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Usato solo per stimare il fabbisogno calorico quando manca un BMR misurato — vedi
+              scheda ricette del paziente.
+            </p>
           </div>
 
           <div className="space-y-1.5">

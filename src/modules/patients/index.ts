@@ -1,8 +1,10 @@
 export type {
   Patient,
   PatientStatus,
+  PatientSex,
   NutritionGoal,
   ActivityLevel,
+  DietIntensity,
   PatientMeasurement,
 } from "./types";
 export {
@@ -31,6 +33,10 @@ export { calculateBmi } from "./bmi";
 export {
   getNutritionGoalLabel,
   getActivityLevelLabel,
+  getSexLabel,
+  getDietIntensityLabel,
   NUTRITION_GOAL_OPTIONS,
   ACTIVITY_LEVEL_OPTIONS,
+  SEX_OPTIONS,
+  DIET_INTENSITY_OPTIONS,
 } from "./labels";
