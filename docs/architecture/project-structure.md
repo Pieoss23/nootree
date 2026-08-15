@@ -21,6 +21,10 @@ src/
 │   │       └── [id]/                 # Dettaglio ricetta: ingredients-section/-table (aggiunta/rimozione
 │   │                                  # ingredienti da catalogo o prodotti tenant), nutrition-summary.tsx
 │   │                                  # (totali calcolati, non salvati), actions.ts a parte
+│   │   └── appointments/         # page.tsx (Server Component, ?view=agenda|week|month&date=),
+│   │                               # agenda-list.tsx, week-grid.tsx (griglia a ore, lane-packing per le
+│   │                               # sovrapposizioni), month-grid.tsx, appointment-form-dialog.tsx
+│   │                               # (create+edit), actions.ts
 │   ├── admin/                   # Amministrazione piattaforma, sorella di (app)/app (NON annidata,
 │   │                              # non tenant-scoped): layout.tsx chiama requireSuperuser(), page.tsx
 │   │                              # lista tutti i tenant — vedi ADR 005
@@ -44,6 +48,9 @@ src/
 │   │                                    # personalizzati per tenant (implementato)
 │   ├── recipes/                        # CRUD ricette + ingredienti, calcolo nutrizionale (nutrition.ts,
 │   │                                     # puro) e stima fabbisogno/dosaggio (dosage.ts, puro) (implementato)
+│   ├── appointments/                  # CRUD appuntamenti; calendar.ts (puro, testato: range
+│   │                                    # agenda/settimana/mese, packAppointmentsIntoLanes per il layout
+│   │                                    # a corsie della griglia settimanale) (implementato)
 │   ├── audit/                        # recordAuditEvent, append-only (implementato)
 │   └── notifications/                # EmailProvider + ConsoleEmailProvider (dev-only)
 ├── components/

@@ -38,6 +38,7 @@ import {
 // but not inside Vitest's environment. Same class of issue as the
 // server-only barrel gotcha, see docs/audit/open-risks.md.
 import { listAllTenants, listAllUsers } from "@/modules/platform/admin-repository";
+import { createAppointment, listAppointmentsByTenantInRange } from "@/modules/appointments";
 
 /**
  * Exercises the database against TEST_DATABASE_URL only — never the
@@ -117,6 +118,7 @@ describe.skipIf(!testDatabaseUrl)("database integration", () => {
     const featureKeys = rows.map((row) => row.featureKey).sort();
     expect(featureKeys).toEqual(
       [
+        "appointments.management",
         "billing.portal",
         "nutrition.plans",
         "patients.management",
@@ -838,5 +840,127 @@ describe.skipIf(!testDatabaseUrl)("database integration", () => {
     expect(row).toBeDefined();
     expect(row?.platformRole).toBe("SUPERUSER");
     expect(row?.membershipCount).toBe(0);
+  });
+
+  it("scopes appointment reads to the requested tenant", async () => {
+    const [tenantA] = await db
+      .insert(schema.tenants)
+      .values({ name: "Appt Tenant A", slug: `appt-a-${randomUUID()}` })
+      .returning();
+    const [tenantB] = await db
+      .insert(schema.tenants)
+      .values({ name: "Appt Tenant B", slug: `appt-b-${randomUUID()}` })
+      .returning();
+    const [staffA] = await db
+      .insert(schema.users)
+      .values({ email: `appt-staff-a-${randomUUID()}@example.test` })
+      .returning();
+    const [staffB] = await db
+      .insert(schema.users)
+      .values({ email: `appt-staff-b-${randomUUID()}@example.test` })
+      .returning();
+    const [patientA] = await db
+      .insert(schema.patients)
+      .values({ tenantId: tenantA.id, firstName: "A", lastName: "Paziente" })
+      .returning();
+    const [patientB] = await db
+      .insert(schema.patients)
+      .values({ tenantId: tenantB.id, firstName: "B", lastName: "Paziente" })
+      .returning();
+
+    await createAppointment({
+      tenantId: tenantA.id,
+      patientId: patientA.id,
+      staffUserId: staffA.id,
+      startsAt: new Date("2026-09-01T09:00:00"),
+      endsAt: new Date("2026-09-01T09:30:00"),
+      notes: null,
+    });
+    await createAppointment({
+      tenantId: tenantB.id,
+      patientId: patientB.id,
+      staffUserId: staffB.id,
+      startsAt: new Date("2026-09-01T09:00:00"),
+      endsAt: new Date("2026-09-01T09:30:00"),
+      notes: null,
+    });
+
+    const resultsA = await listAppointmentsByTenantInRange({
+      tenantId: tenantA.id,
+      from: new Date("2026-08-25T00:00:00"),
+      to: new Date("2026-09-08T00:00:00"),
+    });
+
+    expect(resultsA).toHaveLength(1);
+    expect(resultsA[0].patientId).toBe(patientA.id);
+  });
+
+  it("excludes appointments outside the requested [from, to) range", async () => {
+    const [tenant] = await db
+      .insert(schema.tenants)
+      .values({ name: "Appt Range Tenant", slug: `appt-range-${randomUUID()}` })
+      .returning();
+    const [staff] = await db
+      .insert(schema.users)
+      .values({ email: `appt-range-staff-${randomUUID()}@example.test` })
+      .returning();
+    const [patient] = await db
+      .insert(schema.patients)
+      .values({ tenantId: tenant.id, firstName: "Range", lastName: "Paziente" })
+      .returning();
+
+    const makeAppointment = (startsAt: string) =>
+      createAppointment({
+        tenantId: tenant.id,
+        patientId: patient.id,
+        staffUserId: staff.id,
+        startsAt: new Date(startsAt),
+        endsAt: new Date(new Date(startsAt).getTime() + 30 * 60 * 1000),
+        notes: null,
+      });
+
+    await makeAppointment("2026-09-09T09:00:00"); // prima del range
+    const inRange = await makeAppointment("2026-09-10T09:00:00"); // dentro il range
+    await makeAppointment("2026-09-17T09:00:00"); // dopo il range (>= to, esclusivo)
+
+    const results = await listAppointmentsByTenantInRange({
+      tenantId: tenant.id,
+      from: new Date("2026-09-10T00:00:00"),
+      to: new Date("2026-09-17T00:00:00"),
+    });
+
+    expect(results).toHaveLength(1);
+    expect(results[0].id).toBe(inRange.id);
+  });
+
+  it("cascades tenant deletion to its appointments", async () => {
+    const [tenant] = await db
+      .insert(schema.tenants)
+      .values({ name: "Appt Cascade Tenant", slug: `appt-cascade-${randomUUID()}` })
+      .returning();
+    const [staff] = await db
+      .insert(schema.users)
+      .values({ email: `appt-cascade-staff-${randomUUID()}@example.test` })
+      .returning();
+    const [patient] = await db
+      .insert(schema.patients)
+      .values({ tenantId: tenant.id, firstName: "Cascade", lastName: "Paziente" })
+      .returning();
+    await createAppointment({
+      tenantId: tenant.id,
+      patientId: patient.id,
+      staffUserId: staff.id,
+      startsAt: new Date("2026-09-20T09:00:00"),
+      endsAt: new Date("2026-09-20T09:30:00"),
+      notes: null,
+    });
+
+    await db.delete(schema.tenants).where(eq(schema.tenants.id, tenant.id));
+
+    const remaining = await db
+      .select()
+      .from(schema.appointments)
+      .where(eq(schema.appointments.tenantId, tenant.id));
+    expect(remaining).toHaveLength(0);
   });
 });

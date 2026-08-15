@@ -23,7 +23,9 @@ export const FEATURE_KEYS = {
   TEAM_MANAGEMENT: "team.management",
   BILLING_PORTAL: "billing.portal",
   AUDIT_EXTENDED: "audit.extended",
-  FUTURE_APPOINTMENTS: "future.appointments",
+  // Attivata il 2026-08-14 (era un placeholder "future.*"): agenda/calendario
+  // appuntamenti pazienti — vedi docs/audit/decisions.md.
+  APPOINTMENTS_MANAGEMENT: "appointments.management",
   FUTURE_DOCUMENTS: "future.documents",
   FUTURE_ACCOUNTING: "future.accounting",
 } as const;
@@ -56,6 +58,7 @@ export const PLAN_DEFINITIONS: Record<PlanKey, PlanDefinition> = {
       FEATURE_KEYS.PRODUCTS_CATALOG,
       FEATURE_KEYS.RECIPES_MANAGEMENT,
       FEATURE_KEYS.NUTRITION_PLANS,
+      FEATURE_KEYS.APPOINTMENTS_MANAGEMENT,
     ],
     limits: {
       activePatients: 30,
@@ -72,6 +75,7 @@ export const PLAN_DEFINITIONS: Record<PlanKey, PlanDefinition> = {
       FEATURE_KEYS.PRODUCTS_CATALOG,
       FEATURE_KEYS.RECIPES_MANAGEMENT,
       FEATURE_KEYS.NUTRITION_PLANS,
+      FEATURE_KEYS.APPOINTMENTS_MANAGEMENT,
       FEATURE_KEYS.TEAM_MANAGEMENT,
       FEATURE_KEYS.BILLING_PORTAL,
     ],
@@ -90,6 +94,7 @@ export const PLAN_DEFINITIONS: Record<PlanKey, PlanDefinition> = {
       FEATURE_KEYS.PRODUCTS_CATALOG,
       FEATURE_KEYS.RECIPES_MANAGEMENT,
       FEATURE_KEYS.NUTRITION_PLANS,
+      FEATURE_KEYS.APPOINTMENTS_MANAGEMENT,
       FEATURE_KEYS.TEAM_MANAGEMENT,
       FEATURE_KEYS.BILLING_PORTAL,
       FEATURE_KEYS.AUDIT_EXTENDED,
@@ -135,9 +140,9 @@ export const FEATURE_DEFINITIONS: Record<FeatureKey, { name: string; description
     name: "Audit esteso",
     description: "Storico eventi applicativi esteso.",
   },
-  "future.appointments": {
-    name: "Agenda (in arrivo)",
-    description: "Gestione appuntamenti — non ancora disponibile.",
+  "appointments.management": {
+    name: "Agenda",
+    description: "Calendario e gestione degli appuntamenti dei pazienti.",
   },
   "future.documents": {
     name: "Documenti clinici (in arrivo)",

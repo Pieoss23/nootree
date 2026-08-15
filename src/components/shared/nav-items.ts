@@ -7,6 +7,7 @@ import {
   Settings,
   Apple,
   ChefHat,
+  CalendarDays,
 } from "lucide-react";
 
 export type NavItem = {
@@ -18,6 +19,7 @@ export type NavItem = {
 export const NAV_ITEMS: NavItem[] = [
   { label: "Oggi", href: "/app", icon: LayoutDashboard },
   { label: "Pazienti", href: "/app/patients", icon: Users },
+  { label: "Agenda", href: "/app/appointments", icon: CalendarDays },
   { label: "Catalogo prodotti", href: "/app/products", icon: Apple },
   { label: "Ricette", href: "/app/recipes", icon: ChefHat },
   { label: "Team", href: "/app/team", icon: UsersRound },

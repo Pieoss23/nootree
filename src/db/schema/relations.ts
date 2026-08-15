@@ -14,6 +14,7 @@ import {
 import { patients, patientMeasurements } from "./patients";
 import { foodItems, tenantProducts } from "./products";
 import { recipes, recipeIngredients, patientRecipes } from "./recipes";
+import { appointments } from "./appointments";
 
 export const usersRelations = relations(users, ({ many }) => ({
   accounts: many(accounts),
@@ -40,6 +41,7 @@ export const tenantsRelations = relations(tenants, ({ one, many }) => ({
   products: many(tenantProducts),
   recipes: many(recipes),
   patientRecipes: many(patientRecipes),
+  appointments: many(appointments),
   entitlements: many(tenantEntitlements),
   billingCustomer: one(billingCustomers, {
     fields: [tenants.id],
@@ -106,6 +108,13 @@ export const patientsRelations = relations(patients, ({ one, many }) => ({
   tenant: one(tenants, { fields: [patients.tenantId], references: [tenants.id] }),
   measurements: many(patientMeasurements),
   recipes: many(patientRecipes),
+  appointments: many(appointments),
+}));
+
+export const appointmentsRelations = relations(appointments, ({ one }) => ({
+  tenant: one(tenants, { fields: [appointments.tenantId], references: [tenants.id] }),
+  patient: one(patients, { fields: [appointments.patientId], references: [patients.id] }),
+  staffUser: one(users, { fields: [appointments.staffUserId], references: [users.id] }),
 }));
 
 export const patientMeasurementsRelations = relations(patientMeasurements, ({ one }) => ({

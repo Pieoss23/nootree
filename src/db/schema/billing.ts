@@ -23,7 +23,7 @@ export const plans = pgTable("plans", {
 
 export const features = pgTable("features", {
   id: uuid("id").primaryKey().defaultRandom(),
-  // e.g. "patients.management", "future.appointments".
+  // e.g. "patients.management", "appointments.management".
   key: text("key").notNull().unique(),
   name: text("name").notNull(),
   description: text("description"),

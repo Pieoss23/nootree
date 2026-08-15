@@ -45,6 +45,10 @@ Schema definito in `src/db/schema/*`, migrazioni generate in `src/db/migrations/
 - **recipeIngredients** — una riga per ingrediente, `quantityGrams` sempre in grammi. L'ingrediente è o `foodItemId` (catalogo condiviso) o `tenantProductId` (prodotto del tenant), **mai entrambi né nessuno dei due** — vincolo imposto con un `CHECK` a livello DB (`recipe_ingredients_single_source`), non solo applicativo, perché Postgres non ha un vero FK polimorfico. `tenantId` denormalizzato come FK diretta (Regola 2 di `docs/security/tenant-isolation-rules.md`).
 - **patientRecipes** — assegnazione di una ricetta a un paziente: `portionGrams` (valore effettivo, sempre presente) e `suggestedPortionGrams?` (snapshot del calcolo di `src/modules/recipes/dosage.ts` al momento dell'assegnazione, mai vincolante). Aggiunta/eliminazione, non modifica — stesso ragionamento di `patient_measurements`.
 
+## Appuntamenti (`appointments.ts`)
+
+- **appointments** — `tenantId` (FK tenants, cascade), `patientId` (FK patients, cascade), `staffUserId` (FK users, restrict — chi tiene l'appuntamento, tra le membership attive del tenant), `startsAt`/`endsAt` (`timestamptz`, `notNull`), `status` (enum `appointment_status`: `SCHEDULED|COMPLETED|CANCELLED|NO_SHOW`, default `SCHEDULED`), `notes?`. Indici su `tenantId`, `(tenantId, startsAt)` (range query per le tre viste agenda/settimana/mese) e `(tenantId, patientId)`. Nessun controllo di sovrapposizione a livello DB o applicativo — scelta esplicita, vedi `docs/audit/decisions.md`: lo studio si organizza da sé, la UI gestisce solo la sovrapposizione *visivamente* nella griglia settimanale.
+
 ## Audit (`audit.ts`)
 
 - **auditEvents** — `tenantId?, actorUserId?, action, entityType, entityId?, requestId?, metadata (jsonb, minimizzato), ipHash?, userAgent?, createdAt`. Append-only per convenzione applicativa (`recordAuditEvent` è l'unica funzione che scrive in questa tabella).
