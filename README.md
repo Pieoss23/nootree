@@ -1,6 +1,32 @@
 # nootree
 
-Gestionale SaaS multi-tenant per studi di nutrizione — **Milestone 1: fondazioni**. Non è un prodotto completo: vedi [docs/product/milestone-01-scope.md](docs/product/milestone-01-scope.md) per cosa è realmente implementato e cosa è solo predisposto.
+Gestionale SaaS **multi-tenant** per studi di nutrizione: più studi sullo
+stesso database, ciascuno che vede soltanto i propri dati. Pazienti, piani
+alimentari, appuntamenti, ricette e fatturazione, con isolamento fra tenant
+verificato dai test, non solo dichiarato.
+
+> **Stato: Milestone 1 — fondazioni.** Non è un prodotto completo. Cosa è
+> davvero implementato e cosa è solo predisposto sta in
+> [docs/product/milestone-01-scope.md](docs/product/milestone-01-scope.md),
+> e i problemi ancora aperti in
+> [docs/audit/open-risks.md](docs/audit/open-risks.md).
+
+## Cosa dimostra questo progetto
+
+- **Multi-tenancy presa sul serio.** Le regole di isolamento sono scritte
+  ([docs/security/tenant-isolation-rules.md](docs/security/tenant-isolation-rules.md))
+  e coperte da test di integrazione: in un gestionale sanitario una query
+  che dimentica il filtro sul tenant è un incidente, non un bug.
+- **Dominio diviso in moduli.** Dodici aree separate — pazienti,
+  appuntamenti, ricette, fatturazione, identità, entitlements, audit,
+  notifiche — invece di un unico blocco indistinto.
+- **TypeScript in modalità strict**, con validazione a runtime tramite Zod
+  ai confini: i tipi spariscono in esecuzione, i dati in ingresso no.
+- **Rischi aperti dichiarati.** `docs/audit/open-risks.md` elenca quello che
+  non è ancora risolto. Un progetto che dichiara i propri buchi è più
+  affidabile di uno che finge di non averne.
+- **Decisioni tracciate** in `docs/audit/decisions.md`, con il motivo delle
+  scelte e non solo il risultato.
 
 ## Quick start
 
