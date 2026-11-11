@@ -47,7 +47,7 @@ Schema definito in `src/db/schema/*`, migrazioni generate in `src/db/migrations/
 
 ## Appuntamenti (`appointments.ts`)
 
-- **appointments** — `tenantId` (FK tenants, cascade), `patientId` (FK patients, cascade), `staffUserId` (FK users, restrict — chi tiene l'appuntamento, tra le membership attive del tenant), `startsAt`/`endsAt` (`timestamptz`, `notNull`), `status` (enum `appointment_status`: `SCHEDULED|COMPLETED|CANCELLED|NO_SHOW`, default `SCHEDULED`), `notes?`. Indici su `tenantId`, `(tenantId, startsAt)` (range query per le tre viste agenda/settimana/mese) e `(tenantId, patientId)`. Nessun controllo di sovrapposizione a livello DB o applicativo — scelta esplicita, vedi `docs/audit/decisions.md`: lo studio si organizza da sé, la UI gestisce solo la sovrapposizione *visivamente* nella griglia settimanale.
+- **appointments** — `tenantId` (FK tenants, cascade), `patientId` (FK patients, cascade), `staffUserId` (FK users, restrict — chi tiene l'appuntamento, tra le membership attive del tenant), `startsAt`/`endsAt` (`timestamptz`, `notNull`), `status` (enum `appointment_status`: `SCHEDULED|COMPLETED|CANCELLED|NO_SHOW`, default `SCHEDULED`), `notes?`. Indici su `tenantId`, `(tenantId, startsAt)` (range query per le tre viste agenda/settimana/mese) e `(tenantId, patientId)`. Nessun controllo di sovrapposizione a livello DB o applicativo — scelta esplicita, vedi `docs/audit/decisions.md`: lo studio si organizza da sé, la UI gestisce solo la sovrapposizione _visivamente_ nella griglia settimanale.
 
 ## Audit (`audit.ts`)
 

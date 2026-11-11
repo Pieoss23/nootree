@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    # I test di integrazione si auto-saltano quando TEST_DATABASE_URL non è
+    # configurata (vedi src/tests/db.integration.test.ts). In CI il database
+    # c'è, così la suite gira per intero: migrazioni applicate da uno schema
+    # vuoto e regole di isolamento fra tenant verificate davvero.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: nootree
+          POSTGRES_PASSWORD: nootree
+          POSTGRES_DB: nootree_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U nootree -d nootree_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://nootree:nootree@localhost:5432/nootree_test
+      TEST_DATABASE_URL: postgresql://nootree:nootree@localhost:5432/nootree_test
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check formatting
+        run: pnpm format:check
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Type-check
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build

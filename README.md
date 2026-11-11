@@ -1,5 +1,8 @@
 # nootree
 
+[![CI](https://github.com/Pieoss23/nootree/actions/workflows/ci.yml/badge.svg)](https://github.com/Pieoss23/nootree/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 Gestionale SaaS **multi-tenant** per studi di nutrizione: più studi sullo
 stesso database, ciascuno che vede soltanto i propri dati. Pazienti, piani
 alimentari, appuntamenti, ricette e fatturazione, con isolamento fra tenant
@@ -40,6 +43,21 @@ pnpm dev
 ```
 
 Dettagli completi: [docs/setup/local-development.md](docs/setup/local-development.md).
+
+## Verifiche
+
+```bash
+pnpm check   # formattazione, lint, tipi, test
+```
+
+**146 test su 22 file.** I 117 unitari girano senza dipendenze esterne; i 29
+di integrazione richiedono `TEST_DATABASE_URL` e si saltano da soli quando non
+è configurata, così `pnpm test` resta verde anche senza un Postgres locale.
+
+La CI (`.github/workflows/ci.yml`) il database invece ce l'ha, quindi li
+esegue tutti: le migrazioni vengono applicate da uno schema vuoto a ogni
+push e le regole di isolamento fra tenant sono verificate contro PostgreSQL
+reale, non contro un mock.
 
 ## Stack
 
